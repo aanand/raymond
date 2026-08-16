@@ -18,6 +18,19 @@ const viewportWidth = viewportHeight * (imageWidth/imageHeight);
 const cameraCenter = d.vec3f(0, 0, 0);
 
 async function initialize() {
+  const viewportU = d.vec3f(viewportWidth, 0, 0);
+  const viewportV = d.vec3f(0, -viewportHeight, 0);
+
+  const pixelDeltaU = viewportU.div(imageWidth);
+  const pixelDeltaV = viewportV.div(imageHeight);
+
+  const viewportUpperLeft = cameraCenter
+    .sub(d.vec3f(0, 0, focalLength))
+    .sub(viewportU.div(2))
+    .sub(viewportV.div(2));
+
+  const pixel00Loc = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).mul(0.5));
+
   const canvas = document.querySelector('canvas') as HTMLCanvasElement;
   canvas.width = imageWidth;
   canvas.height = imageHeight;
@@ -31,47 +44,21 @@ async function initialize() {
 
   const numPixels = imageWidth * imageHeight;
   const state = root.createMutable(d.struct({
-    imageWidth: d.u32,
-    imageHeight: d.u32,
-    focalLength: d.f32,
-    viewportWidth: d.f32,
-    viewportHeight: d.f32,
-    cameraCenter: d.vec3f,
     pixels: d.arrayOf(d.u32, numPixels),
   }), {
-    imageWidth,
-    imageHeight,
-    focalLength,
-    viewportWidth,
-    viewportHeight,
-    cameraCenter,
     pixels: new Uint32Array(numPixels),
   });
 
   const program = root.createGuardedComputePipeline((threadId) => {
     'use gpu';
 
-    // begin extractable calculations
+    const i = d.u32(threadId % imageWidth);
+    const j = d.u32(threadId / imageHeight);
 
-    const viewportU = d.vec3f(state.$.viewportWidth, 0, 0);
-    const viewportV = d.vec3f(0, -state.$.viewportHeight, 0);
+    const pixelCenter = pixel00Loc
+      .add(pixelDeltaU.mul(d.f32(i)))
+      .add(pixelDeltaV.mul(d.f32(j)));
 
-    const pixelDeltaU = viewportU.div(state.$.imageWidth);
-    const pixelDeltaV = viewportV.div(state.$.imageHeight);
-
-    const viewportUpperLeft = state.$.cameraCenter
-      .sub(d.vec3f(0, 0, state.$.focalLength))
-      .sub(viewportU.div(2))
-      .sub(viewportV.div(2));
-
-    const pixel00Loc = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).mul(0.5));
-
-    // end extractable calculations
-
-    const i = d.u32(threadId % state.$.imageWidth);
-    const j = d.u32(threadId / state.$.imageWidth);
-
-    const pixelCenter = pixel00Loc.add(pixelDeltaU.mul(i)).add(pixelDeltaV.mul(j));
     const rayDirection = pixelCenter.sub(cameraCenter);
 
     const unitDirection = normalize(rayDirection);
