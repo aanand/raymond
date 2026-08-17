@@ -188,7 +188,7 @@ function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
   });
 
   return tgpu.fn([Ray, World, d.vec2f, d.u32], RayTraceResult)((ray, world, uv, time) => {
-    const hitRecord = hitWorld(world, ray, interval(0, INF));
+    const hitRecord = hitWorld(world, ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
       const color = d.vec3f(0.5, 0.5, 0.5);
