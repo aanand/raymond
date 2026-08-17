@@ -1,4 +1,5 @@
 import tgpu, { d } from "typegpu";
+import { fract } from "typegpu/std";
 
 export const INF = d.f32(3.40282347e+38);
 
@@ -38,3 +39,7 @@ export const didNotHit = () => {
     isFrontFace: false,
   });
 }
+
+// Jorge Jimenez' "interleaved gradient noise", from https://medium.com/@jcowles/gpu-ray-tracing-in-one-weekend-3e7d874b3b0f
+export const noise = tgpu.fn([d.f32, d.f32], d.f32)((x, y) =>
+   fract(52.9829189 * fract(x * 0.06711056 + y * 0.00583715)));
