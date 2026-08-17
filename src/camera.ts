@@ -77,15 +77,13 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
       .add(pixelDeltaU.mul(d.f32(x) + offsetX))
       .add(pixelDeltaV.mul(d.f32(y) + offsetY));
 
-    const uv = d.vec2f(d.f32(x), d.f32(y));
-
     const ray = Ray({
       origin: cameraCenter,
       direction: pixelCenter.sub(cameraCenter)
     });
 
     const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const result = rayTrace(ray, world, uv, floor(randomFloat * 1000), 1000);
+    const result = rayTrace(ray, world, floor(randomFloat * 1000), 1000);
 
     state.$.currentSample[pixelIndex] = d.vec3f(result.color);
     state.$.bounces[pixelIndex] = Bounce(result.bounce);
@@ -101,7 +99,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
 
     const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const bounceResult = rayTrace(bounce.ray, world, bounce.uv, floor(randomFloat * 1000), 1000);
+    const bounceResult = rayTrace(bounce.ray, world, floor(randomFloat * 1000), 1000);
     const currentValue = state.$.currentSample[pixelIndex];
 
     state.$.currentSample[pixelIndex] = d.vec3f(
@@ -113,7 +111,6 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     state.$.bounces[pixelIndex] = Bounce({
       didBounce: bounceResult.bounce.didBounce,
       ray: bounceResult.bounce.ray,
-      uv: bounce.uv,
     });
   });
 
@@ -192,7 +189,7 @@ function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
     return hitRecord;
   });
 
-  return tgpu.fn([Ray, World, d.vec2f, d.f32, d.f32], RayTraceResult)((ray, world, uv, i, samples) => {
+  return tgpu.fn([Ray, World, d.f32, d.f32], RayTraceResult)((ray, world, i, samples) => {
     const hitRecord = hitWorld(world, ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
@@ -201,7 +198,7 @@ function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
       const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
       return RayTraceResult({
         color,
-        bounce: Bounce({ didBounce: 1, ray: bouncedRay, uv }),
+        bounce: Bounce({ didBounce: 1, ray: bouncedRay }),
       });
     } else {
       const unitDirection = normalize(ray.direction);

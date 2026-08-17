@@ -46,7 +46,6 @@ export const Bounce = d.struct({
   // Compared to d.bool, this is both host-shareable and easy to sum.
   didBounce: d.u32,
   ray: Ray,
-  uv: d.vec2f, // pixel coords of the originating ray, used as seed for noise
 });
 
 export const didNotBounce = () => {
@@ -54,7 +53,6 @@ export const didNotBounce = () => {
   return Bounce({
     didBounce: 0,
     ray: Ray({ origin: d.vec3f(0, 0, 0), direction: d.vec3f(0, 0, 1) }),
-    uv: d.vec2f(0, 0),
   });
 }
 
