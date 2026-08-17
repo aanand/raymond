@@ -1,11 +1,13 @@
 import { tgpu, d } from 'typegpu';
-import { dot, length, normalize, pack4x8unorm, sqrt } from 'typegpu/std';
+import { dot, length, normalize, pack4x8unorm, select, sqrt } from 'typegpu/std';
 
 import './style.css'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 <canvas></canvas>
 `
+
+const INF = d.f32(3.40282347e+38);
 
 const aspectRatio = d.f32(16.0/9.0);
 const imageWidth = d.u32(400);
@@ -27,29 +29,78 @@ const at = (ray: d.Infer<typeof Ray>, t: number) => {
   return ray.origin.add(ray.direction.mul(t));
 }
 
-const hitSphere = (center: d.v3f, radius: number, ray: d.Infer<typeof Ray>) => {
+const HitRecord = d.struct({
+  isHit: d.bool,
+  position: d.vec3f,
+  normal: d.vec3f,
+  t: d.f32,
+  isFrontFace: d.bool,
+});
+
+const didNotHit = () => {
   'use gpu';
-  const oc = center.sub(ray.origin);
+  return HitRecord({
+    isHit: false,
+    position: d.vec3f(0, 0, 0),
+    normal: d.vec3f(0, 0, 1),
+    t: 0,
+    isFrontFace: false,
+  });
+}
+
+const Sphere = d.struct({
+  center: d.vec3f,
+  radius: d.f32,
+});
+
+const hitSphere = (
+  sphere: d.Infer<typeof Sphere>,
+  ray: d.Infer<typeof Ray>,
+  tMin: number,
+  tMax: number,
+) => {
+  'use gpu';
+  const oc = sphere.center.sub(ray.origin);
   const a = length(ray.direction) ** 2;
   const h = dot(ray.direction, oc);
-  const c = length(oc) ** 2 - radius*radius;
+  const c = length(oc) ** 2 - (sphere.radius * sphere.radius);
   const discriminant = h*h - a*c;
-  
+
   if (discriminant < 0) {
-    return d.f32(-1.0);
-  } else {
-    return d.f32((h - sqrt(discriminant)) / a);
+    return didNotHit();
   }
+
+  const sqrtd = sqrt(discriminant);
+
+  // Find the nearest root that lies in the acceptable range.
+  let root = (h - sqrtd) / a;
+  if (root <= tMin || tMax <= root) {
+    root = (h + sqrtd) / a;
+    if (root <= tMin || tMax <= root) {
+      return didNotHit();
+    }
+  }
+
+  const t = root;
+  const position = at(ray, t);
+  const outwardNormal = position.sub(sphere.center).div(sphere.radius);
+  const isFrontFace = dot(ray.direction, outwardNormal) < 0;
+  // const normal = isFrontFace ? outwardNormal : outwardNormal.mul(-1);
+  const normal = select(outwardNormal.mul(-1), outwardNormal, isFrontFace);
+
+  return HitRecord({ isHit: true, position, normal, t, isFrontFace });
 }
 
 const rayColor = (ray: d.Infer<typeof Ray>) => {
   'use gpu';
 
-  const t = hitSphere(d.vec3f(0, 0, -1), 0.5, ray);
+  const sphere = Sphere({ center: d.vec3f(0, 0, -1), radius: 0.5 });
 
-  if (t > 0.0) {
-    const N = normalize(at(ray, t).sub(d.vec3f(0, 0, -1)));
-    return d.vec4f((N.x + 1)/2, (N.y + 1)/2, (N.z + 1)/2, 1.0);
+  const hitRecord = hitSphere(sphere, ray, d.f32(0), INF);
+
+  if (hitRecord.isHit) {
+    const N = hitRecord.normal.add(1).div(2);
+    return d.vec4f(N.x, N.y, N.z, 1.0);
   } else {
     const unitDirection = normalize(ray.direction);
     const a = 0.5 * (unitDirection.y + 1.0);
@@ -94,6 +145,11 @@ async function initialize() {
 
     const i = d.u32(threadId % imageWidth);
     const j = d.u32(threadId / imageWidth);
+
+    // if (i !== d.u32(imageWidth/2) || j !== d.u32(imageHeight/2)) {
+    //   state.$.pixels[threadId] = pack4x8unorm(d.vec4f(0, 0, 0, 1));
+    //   return;
+    // }
 
     const pixelCenter = pixel00Loc
       .add(pixelDeltaU.mul(d.f32(i)))
