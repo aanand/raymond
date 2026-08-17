@@ -1,5 +1,5 @@
 import { tgpu, d } from 'typegpu';
-import { dot, normalize, pack4x8unorm, sqrt } from 'typegpu/std';
+import { dot, length, normalize, pack4x8unorm, sqrt } from 'typegpu/std';
 
 import './style.css'
 
@@ -30,15 +30,15 @@ const at = (ray: d.Infer<typeof Ray>, t: number) => {
 const hitSphere = (center: d.v3f, radius: number, ray: d.Infer<typeof Ray>) => {
   'use gpu';
   const oc = center.sub(ray.origin);
-  const a = dot(ray.direction, ray.direction);
-  const b = -2.0 * dot(ray.direction, oc);
-  const c = dot(oc, oc) - radius*radius;
-  const discriminant = b*b - 4*a*c;
+  const a = length(ray.direction) ** 2;
+  const h = dot(ray.direction, oc);
+  const c = length(oc) ** 2 - radius*radius;
+  const discriminant = h*h - a*c;
   
   if (discriminant < 0) {
     return d.f32(-1.0);
   } else {
-    return d.f32((-b - sqrt(discriminant)) / (2.0 * a));
+    return d.f32((h - sqrt(discriminant)) / a);
   }
 }
 
