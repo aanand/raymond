@@ -1,5 +1,5 @@
 import { tgpu, d } from 'typegpu';
-import { dot, normalize, pack4x8unorm } from 'typegpu/std';
+import { dot, normalize, pack4x8unorm, sqrt } from 'typegpu/std';
 
 import './style.css'
 
@@ -22,6 +22,11 @@ const Ray = d.struct({
   direction: d.vec3f,
 });
 
+const at = (ray: d.Infer<typeof Ray>, t: number) => {
+  'use gpu';
+  return ray.origin.add(ray.direction.mul(t));
+}
+
 const hitSphere = (center: d.v3f, radius: number, ray: d.Infer<typeof Ray>) => {
   'use gpu';
   const oc = center.sub(ray.origin);
@@ -29,7 +34,27 @@ const hitSphere = (center: d.v3f, radius: number, ray: d.Infer<typeof Ray>) => {
   const b = -2.0 * dot(ray.direction, oc);
   const c = dot(oc, oc) - radius*radius;
   const discriminant = b*b - 4*a*c;
-  return discriminant >= 0;
+  
+  if (discriminant < 0) {
+    return d.f32(-1.0);
+  } else {
+    return d.f32((-b - sqrt(discriminant)) / (2.0 * a));
+  }
+}
+
+const rayColor = (ray: d.Infer<typeof Ray>) => {
+  'use gpu';
+
+  const t = hitSphere(d.vec3f(0, 0, -1), 0.5, ray);
+
+  if (t > 0.0) {
+    const N = normalize(at(ray, t).sub(d.vec3f(0, 0, -1)));
+    return d.vec4f((N.x + 1)/2, (N.y + 1)/2, (N.z + 1)/2, 1.0);
+  } else {
+    const unitDirection = normalize(ray.direction);
+    const a = 0.5 * (unitDirection.y + 1.0);
+    return d.vec4f(1, 1, 1, 1).mul(1-a).add(d.vec4f(0.5, 0.7, 1.0, 1).mul(a));
+  }
 }
 
 async function initialize() {
@@ -79,15 +104,9 @@ async function initialize() {
       direction: pixelCenter.sub(cameraCenter)
     });
 
-    if (hitSphere(d.vec3f(0, 0, -1), 0.5, ray)) {
-      state.$.pixels[threadId] = pack4x8unorm(d.vec4f(1, 0, 0, 1));
-    } else {
-      const unitDirection = normalize(ray.direction);
-      const a = 0.5 * (unitDirection.y + 1.0);
-      const color = d.vec4f(1, 1, 1, 1).mul(1-a).add(d.vec4f(0.5, 0.7, 1.0, 1).mul(a));
+    const color = rayColor(ray);
 
-      state.$.pixels[threadId] = pack4x8unorm(color);
-    }
+    state.$.pixels[threadId] = pack4x8unorm(color);
   });
 
   program.dispatchThreads(numPixels);
