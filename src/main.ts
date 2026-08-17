@@ -19,6 +19,14 @@ const viewportHeight = d.f32(2.0);
 const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
 const cameraCenter = d.vec3f(0, 0, 0);
 
+const Interval = d.struct({
+  min: d.f32,
+  max: d.f32,
+});
+
+const interval = tgpu.fn([d.f32, d.f32], Interval)((min, max) => Interval({ min, max }));
+const surrounds = tgpu.fn([Interval, d.f32], d.bool)((i, num) => i.min < num && num < i.max);
+
 const Ray = d.struct({
   origin: d.vec3f,
   direction: d.vec3f,
@@ -53,14 +61,7 @@ const Sphere = d.struct({
   radius: d.f32,
 });
 
-const hitSphere = (
-  sphere: d.Infer<typeof Sphere>,
-  ray: d.Infer<typeof Ray>,
-  tMin: number,
-  tMax: number,
-) => {
-  'use gpu';
-
+const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ray, rayT) => {
   const oc = sphere.center.sub(ray.origin);
   const a = length(ray.direction) ** 2;
   const h = dot(ray.direction, oc);
@@ -75,9 +76,9 @@ const hitSphere = (
 
   // Find the nearest root that lies in the acceptable range.
   let root = (h - sqrtd) / a;
-  if (root <= tMin || tMax <= root) {
+  if (!surrounds(rayT, root)) {
     root = (h + sqrtd) / a;
-    if (root <= tMin || tMax <= root) {
+    if (!surrounds(rayT, root)) {
       return didNotHit();
     }
   }
@@ -90,16 +91,14 @@ const hitSphere = (
   const normal = select(outwardNormal.mul(-1), outwardNormal, isFrontFace);
 
   return HitRecord({ isHit: true, position, normal, t, isFrontFace });
-}
+});
 
-const hitWorld = tgpu.fn([d.arrayOf(Sphere, 2), Ray, d.f32, d.f32], HitRecord)((world, ray, tMin, tMax) => {
-  'use gpu';
-
+const hitWorld = tgpu.fn([d.arrayOf(Sphere, 2), Ray, Interval], HitRecord)((world, ray, rayT) => {
   let hitRecord = didNotHit();
-  let closestSoFar = tMax;
+  let closestSoFar = rayT.max;
 
   for (let i = 0; i < world.length; i++) {
-    const sphereHit = hitSphere(world[i], ray, tMin, closestSoFar);
+    const sphereHit = hitSphere(world[i], ray, interval(rayT.min, closestSoFar));
     if (sphereHit.isHit) {
       hitRecord = HitRecord(sphereHit);
       closestSoFar = sphereHit.t;
@@ -112,7 +111,7 @@ const hitWorld = tgpu.fn([d.arrayOf(Sphere, 2), Ray, d.f32, d.f32], HitRecord)((
 const rayColor = tgpu.fn([Ray, d.arrayOf(Sphere, 2)], d.vec4f)((ray, world) => {
   'use gpu';
 
-  const hitRecord = hitWorld(world, ray, d.f32(0), INF);
+  const hitRecord = hitWorld(world, ray, interval(0, INF));
 
   if (hitRecord.isHit) {
     const N = hitRecord.normal.add(1).div(2);
