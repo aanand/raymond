@@ -1,5 +1,7 @@
 import tgpu, { d } from "typegpu";
 
+export const INF = d.f32(3.40282347e+38);
+
 export const Interval = d.struct({
   min: d.f32,
   max: d.f32,
