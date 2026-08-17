@@ -1,5 +1,5 @@
 import { tgpu, d } from 'typegpu';
-import { normalize, pack4x8unorm } from 'typegpu/std';
+import { dot, normalize, pack4x8unorm } from 'typegpu/std';
 
 import './style.css'
 
@@ -7,15 +7,30 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 <canvas></canvas>
 `
 
-const aspectRatio = 16/9;
-const imageWidth = 400;
+const aspectRatio = d.f32(16.0/9.0);
+const imageWidth = d.u32(400);
 
-const imageHeight = Math.max(1, Math.floor(imageWidth/aspectRatio));
+const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
 
-const focalLength = 1;
-const viewportHeight = 2;
-const viewportWidth = viewportHeight * (imageWidth/imageHeight);
+const focalLength = d.f32(1.0);
+const viewportHeight = d.f32(2.0);
+const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
 const cameraCenter = d.vec3f(0, 0, 0);
+
+const Ray = d.struct({
+  origin: d.vec3f,
+  direction: d.vec3f,
+});
+
+const hitSphere = (center: d.v3f, radius: number, ray: d.Infer<typeof Ray>) => {
+  'use gpu';
+  const oc = center.sub(ray.origin);
+  const a = dot(ray.direction, ray.direction);
+  const b = -2.0 * dot(ray.direction, oc);
+  const c = dot(oc, oc) - radius*radius;
+  const discriminant = b*b - 4*a*c;
+  return discriminant >= 0;
+}
 
 async function initialize() {
   const viewportU = d.vec3f(viewportWidth, 0, 0);
@@ -53,19 +68,26 @@ async function initialize() {
     'use gpu';
 
     const i = d.u32(threadId % imageWidth);
-    const j = d.u32(threadId / imageHeight);
+    const j = d.u32(threadId / imageWidth);
 
     const pixelCenter = pixel00Loc
       .add(pixelDeltaU.mul(d.f32(i)))
       .add(pixelDeltaV.mul(d.f32(j)));
 
-    const rayDirection = pixelCenter.sub(cameraCenter);
+    const ray = Ray({
+      origin: cameraCenter,
+      direction: pixelCenter.sub(cameraCenter)
+    });
 
-    const unitDirection = normalize(rayDirection);
-    const a = 0.5 * (unitDirection.y + 1.0);
-    const color = d.vec4f(1, 1, 1, 1).mul(1-a).add(d.vec4f(0.5, 0.7, 1.0, 1).mul(a));
-    
-    state.$.pixels[threadId] = pack4x8unorm(color);
+    if (hitSphere(d.vec3f(0, 0, -1), 0.5, ray)) {
+      state.$.pixels[threadId] = pack4x8unorm(d.vec4f(1, 0, 0, 1));
+    } else {
+      const unitDirection = normalize(ray.direction);
+      const a = 0.5 * (unitDirection.y + 1.0);
+      const color = d.vec4f(1, 1, 1, 1).mul(1-a).add(d.vec4f(0.5, 0.7, 1.0, 1).mul(a));
+
+      state.$.pixels[threadId] = pack4x8unorm(color);
+    }
   });
 
   program.dispatchThreads(numPixels);
