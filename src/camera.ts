@@ -55,7 +55,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     randomValues: d.arrayOf(d.u32, numRandomValues),
   }), {
     sampleIndex: 0,
-    currentSample: new Float32Array(numPixels * 3),
+    currentSample: new Float32Array(numPixels * 4),
     accumulatedSamples: new Float32Array(numPixels * 4),
     bounces: Array.from({ length: 100 }).map(didNotBounce),
     pixels: new Uint32Array(numPixels),
