@@ -60,6 +60,7 @@ const hitSphere = (
   tMax: number,
 ) => {
   'use gpu';
+
   const oc = sphere.center.sub(ray.origin);
   const a = length(ray.direction) ** 2;
   const h = dot(ray.direction, oc);
@@ -91,12 +92,27 @@ const hitSphere = (
   return HitRecord({ isHit: true, position, normal, t, isFrontFace });
 }
 
-const rayColor = (ray: d.Infer<typeof Ray>) => {
+const hitWorld = tgpu.fn([d.arrayOf(Sphere, 2), Ray, d.f32, d.f32], HitRecord)((world, ray, tMin, tMax) => {
   'use gpu';
 
-  const sphere = Sphere({ center: d.vec3f(0, 0, -1), radius: 0.5 });
+  let hitRecord = didNotHit();
+  let closestSoFar = tMax;
 
-  const hitRecord = hitSphere(sphere, ray, d.f32(0), INF);
+  for (let i = 0; i < world.length; i++) {
+    const sphereHit = hitSphere(world[i], ray, tMin, closestSoFar);
+    if (sphereHit.isHit) {
+      hitRecord = HitRecord(sphereHit);
+      closestSoFar = sphereHit.t;
+    }
+  }
+
+  return hitRecord;
+});
+
+const rayColor = tgpu.fn([Ray, d.arrayOf(Sphere, 2)], d.vec4f)((ray, world) => {
+  'use gpu';
+
+  const hitRecord = hitWorld(world, ray, d.f32(0), INF);
 
   if (hitRecord.isHit) {
     const N = hitRecord.normal.add(1).div(2);
@@ -106,7 +122,12 @@ const rayColor = (ray: d.Infer<typeof Ray>) => {
     const a = 0.5 * (unitDirection.y + 1.0);
     return d.vec4f(1, 1, 1, 1).mul(1-a).add(d.vec4f(0.5, 0.7, 1.0, 1).mul(a));
   }
-}
+});
+
+const world = d.arrayOf(Sphere, 2)([
+  Sphere({ center: d.vec3f(0,    0,   -1), radius: -0.5 }),
+  Sphere({ center: d.vec3f(0, -100.5, -1), radius:  100 }),
+]);
 
 async function initialize() {
   const viewportU = d.vec3f(viewportWidth, 0, 0);
@@ -160,7 +181,7 @@ async function initialize() {
       direction: pixelCenter.sub(cameraCenter)
     });
 
-    const color = rayColor(ray);
+    const color = rayColor(ray, world);
 
     state.$.pixels[threadId] = pack4x8unorm(color);
   });
