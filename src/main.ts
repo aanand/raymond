@@ -1,7 +1,10 @@
-import { tgpu, d } from 'typegpu';
-import { dot, length, normalize, pack4x8unorm, select, sqrt } from 'typegpu/std';
+import { d, tgpu } from 'typegpu';
+import { normalize, pack4x8unorm } from 'typegpu/std';
 
-import './style.css'
+import { Sphere, hitSphere } from './sphere';
+import { HitRecord, Interval, Ray, didNotHit, interval } from './utils';
+
+import './style.css';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 <canvas></canvas>
@@ -18,80 +21,6 @@ const focalLength = d.f32(1.0);
 const viewportHeight = d.f32(2.0);
 const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
 const cameraCenter = d.vec3f(0, 0, 0);
-
-const Interval = d.struct({
-  min: d.f32,
-  max: d.f32,
-});
-
-const interval = tgpu.fn([d.f32, d.f32], Interval)((min, max) => Interval({ min, max }));
-const surrounds = tgpu.fn([Interval, d.f32], d.bool)((i, num) => i.min < num && num < i.max);
-
-const Ray = d.struct({
-  origin: d.vec3f,
-  direction: d.vec3f,
-});
-
-const at = (ray: d.Infer<typeof Ray>, t: number) => {
-  'use gpu';
-  return ray.origin.add(ray.direction.mul(t));
-}
-
-const HitRecord = d.struct({
-  isHit: d.bool,
-  position: d.vec3f,
-  normal: d.vec3f,
-  t: d.f32,
-  isFrontFace: d.bool,
-});
-
-const didNotHit = () => {
-  'use gpu';
-  return HitRecord({
-    isHit: false,
-    position: d.vec3f(0, 0, 0),
-    normal: d.vec3f(0, 0, 1),
-    t: 0,
-    isFrontFace: false,
-  });
-}
-
-const Sphere = d.struct({
-  center: d.vec3f,
-  radius: d.f32,
-});
-
-const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ray, rayT) => {
-  const oc = sphere.center.sub(ray.origin);
-  const a = length(ray.direction) ** 2;
-  const h = dot(ray.direction, oc);
-  const c = length(oc) ** 2 - (sphere.radius * sphere.radius);
-  const discriminant = h*h - a*c;
-
-  if (discriminant < 0) {
-    return didNotHit();
-  }
-
-  const sqrtd = sqrt(discriminant);
-
-  // Find the nearest root that lies in the acceptable range.
-  let root = (h - sqrtd) / a;
-  if (!surrounds(rayT, root)) {
-    root = (h + sqrtd) / a;
-    if (!surrounds(rayT, root)) {
-      return didNotHit();
-    }
-  }
-
-  const t = root;
-  const position = at(ray, t);
-  const outwardNormal = position.sub(sphere.center).div(sphere.radius);
-  const isFrontFace = dot(ray.direction, outwardNormal) < 0;
-  // const normal = isFrontFace ? outwardNormal : outwardNormal.mul(-1);
-  const normal = select(outwardNormal.mul(-1), outwardNormal, isFrontFace);
-
-  return HitRecord({ isHit: true, position, normal, t, isFrontFace });
-});
 
 const hitWorld = tgpu.fn([d.arrayOf(Sphere, 2), Ray, Interval], HitRecord)((world, ray, rayT) => {
   let hitRecord = didNotHit();
