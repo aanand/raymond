@@ -1,8 +1,8 @@
 import tgpu, { d } from "typegpu";
-import { normalize, pack4x8unorm } from "typegpu/std";
+import { floor, normalize, pack4x8unorm } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
-import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomOnHemisphere } from "./utils";
+import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
 
 export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas }: {
   aspectRatio: number,
@@ -38,22 +38,28 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
 
   const numPixels = imageWidth * imageHeight;
 
+  const numRandomValues = Math.floor(65536 / Uint32Array.BYTES_PER_ELEMENT);
+
+  const generateRandomValues = () => {
+    const values = new Uint32Array(numRandomValues);
+    crypto.getRandomValues(values);
+    return values;
+  }
+
   const state = root.createMutable(d.struct({
     sampleIndex: d.u32,
     currentSample: d.arrayOf(d.vec3f, numPixels),
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
     bounces: d.arrayOf(Bounce, numPixels),
-    // numBounces: d.atomic(d.u32),
     pixels: d.arrayOf(d.u32, numPixels),
-    time: d.u32,
+    randomValues: d.arrayOf(d.u32, numRandomValues),
   }), {
     sampleIndex: 0,
     currentSample: new Float32Array(numPixels * 3),
     accumulatedSamples: new Float32Array(numPixels * 4),
     bounces: Array.from({ length: 100 }).map(didNotBounce),
-    // numBounces: 0,
     pixels: new Uint32Array(numPixels),
-    time: 0,
+    randomValues: new Uint32Array(numRandomValues),
   });
 
   const fireInitialRays = root.createGuardedComputePipeline((pixelIndex) => {
@@ -71,14 +77,15 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
       .add(pixelDeltaU.mul(d.f32(x) + offsetX))
       .add(pixelDeltaV.mul(d.f32(y) + offsetY));
 
-    const uv = d.vec2f((d.f32(x) + offsetX), (d.f32(y) + offsetY));
+    const uv = d.vec2f(d.f32(x), d.f32(y));
 
     const ray = Ray({
       origin: cameraCenter,
       direction: pixelCenter.sub(cameraCenter)
     });
 
-    const result = rayTrace(ray, world, uv, state.$.time);
+    const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
+    const result = rayTrace(ray, world, uv, floor(randomFloat * 1000), 1000);
 
     state.$.currentSample[pixelIndex] = d.vec3f(result.color);
     state.$.bounces[pixelIndex] = Bounce(result.bounce);
@@ -93,7 +100,8 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     // const y = d.u32(pixelIndex / imageWidth);
     // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
 
-    const bounceResult = rayTrace(bounce.ray, world, bounce.uv, state.$.time);
+    const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
+    const bounceResult = rayTrace(bounce.ray, world, bounce.uv, floor(randomFloat * 1000), 1000);
     const currentValue = state.$.currentSample[pixelIndex];
 
     state.$.currentSample[pixelIndex] = d.vec3f(
@@ -119,26 +127,17 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     ));
   });
 
-  let time = 0;
   console.time('Render');
   for (let s = 0; s < samplesPerPixel; s++) {
-    console.time('Fire initial rays');
-    time += Math.floor(Math.random() * 1024);
-    state.patch({ sampleIndex: s, time });
+    state.patch({ sampleIndex: s, randomValues: generateRandomValues() });
     fireInitialRays.dispatchThreads(numPixels);
-    console.timeEnd('Fire initial rays');
 
     for (let i = 0; i < maxBounceDepth; i++) {
-      console.time('Process bounces')
-      time += Math.floor(Math.random() * 1024);
-      state.patch({ time: time });
+      state.patch({ randomValues: generateRandomValues() });
       processBounces.dispatchThreads(numPixels);
-      console.timeEnd('Process bounces');
     }
 
-    console.time('Accumulate current sample');
     accumulateCurrentSample.dispatchThreads(numPixels);
-    console.timeEnd('Accumulate current sample');
   }
 
   console.time('Average samples together');
@@ -187,12 +186,12 @@ function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
     return hitRecord;
   });
 
-  return tgpu.fn([Ray, World, d.vec2f, d.u32], RayTraceResult)((ray, world, uv, time) => {
+  return tgpu.fn([Ray, World, d.vec2f, d.f32, d.f32], RayTraceResult)((ray, world, uv, i, samples) => {
     const hitRecord = hitWorld(world, ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
       const color = d.vec3f(0.5, 0.5, 0.5);
-      const bounceDirection = randomOnHemisphere(uv[0]*time, uv[1]*time, hitRecord.normal);
+      const bounceDirection = hitRecord.normal.add(randomUnitVector(i, samples));
       const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
       return RayTraceResult({
         color,

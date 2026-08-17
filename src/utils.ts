@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { cos, dot, fract, sin, sqrt } from "typegpu/std";
+import { fract } from "typegpu/std";
 
 export const INF = d.f32(3.40282347e+38);
 export const PI = d.f32(3.1415927);
@@ -64,23 +64,14 @@ export const noise = tgpu.fn([d.f32, d.f32], d.f32)((i, j) =>
 
 // Adapted from https://stackoverflow.com/a/26127012
 // i should be in the range [0, 1]
-const fibonacciSphere = tgpu.fn([d.f32], d.vec3f)(i => {
-  const phi = PI * (sqrt(5.0) - 1.0);
-  const y = 1 - i * 2;
-  const radius = sqrt(1 - y*y);
-  const theta = phi * i;
-  const x = cos(theta) * radius;
-  const z = sin(theta) * radius;
-  return d.vec3f(x, y, z);
-});
+const fibonacciSphere = tgpu.fn([d.f32, d.f32], d.vec3f)`(i: f32, samples: f32) -> vec3f {
+  let phi = 3.1415927 * (sqrt(5.0) - 1.0);
+  let y = 1.0 - (i / (samples - 1.0)) * 2.0;
+  let radius = sqrt(1.0 - y*y);
+  let theta = phi * i;
+  let x = cos(theta) * radius;
+  let z = sin(theta) * radius;
+  return vec3f(x, y, z);
+}`;
 
-const randomUnitVector = tgpu.fn([d.f32, d.f32], d.vec3f)((i, j) => fibonacciSphere(noise(i, j)));
-
-export const randomOnHemisphere = tgpu.fn([d.f32, d.f32, d.vec3f], d.vec3f)((i, j, normal) => {
-  const onUnitSphere = randomUnitVector(i, j);
-  if (dot(onUnitSphere, normal) > 0.0) {
-    return onUnitSphere;
-  } else {
-    return onUnitSphere.mul(-1);
-  }
-});
+export const randomUnitVector = tgpu.fn([d.f32, d.f32], d.vec3f)((i, numSamples) => fibonacciSphere(i, numSamples));
