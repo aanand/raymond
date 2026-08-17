@@ -7,7 +7,7 @@ import './style.css';
 
 const aspectRatio = d.f32(16.0/9.0);
 const imageWidth = d.u32(800);
-const samplesPerPixel = d.u32(10);
+const samplesPerPixel = d.u32(40);
 const maxBounceDepth = 10;
 
 const world = d.arrayOf(Sphere, 2)([

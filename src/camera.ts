@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { floor, normalize, pack4x8unorm } from "typegpu/std";
+import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
@@ -140,19 +140,25 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     accumulateCurrentSample.dispatchThreads(numPixels);
   }
 
-  console.time('Average samples together');
-  const sum = root.createGuardedComputePipeline((pixelIndex) => {
+  const linearToGamma = tgpu.fn([d.f32], d.f32)(linear => {
+    if (linear > 0) {
+      return sqrt(linear);
+    }
+
+    return 0;
+  });
+
+  const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
     const accumulation = state.$.accumulatedSamples[pixelIndex];
     state.$.pixels[pixelIndex] = pack4x8unorm(d.vec4f(
-      accumulation[0] / accumulation[3],
-      accumulation[1] / accumulation[3],
-      accumulation[2] / accumulation[3],
+      linearToGamma(accumulation[0] / accumulation[3]),
+      linearToGamma(accumulation[1] / accumulation[3]),
+      linearToGamma(accumulation[2] / accumulation[3]),
       1.0
     ));
   });
-  sum.dispatchThreads(numPixels);
-  console.timeEnd('Average samples together')
+  writePixels.dispatchThreads(numPixels);
   console.timeEnd('Render');
 
   const value = await state.read();
