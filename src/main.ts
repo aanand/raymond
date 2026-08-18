@@ -38,36 +38,36 @@ const world: World = {
       materialIndex: 0,
     }),
     Sphere({
-      center: d.vec3f(0, 0, -1.2),
+      center: d.vec3f(0, 0, -1),
       radius:  0.5,
-      materialType: MATERIAL_LAMBERTIAN,
-      materialIndex: 1,
+      materialType: MATERIAL_METAL,
+      materialIndex: 0,
     }),
     Sphere({
-      center: d.vec3f(-1, 0, -1),
+      center: d.vec3f(-1.25, 0, -1),
       radius: 0.5,
       materialType: MATERIAL_DIELECTRIC,
       materialIndex: 0,
     }),
     Sphere({
-      center: d.vec3f(-1, 0, -1),
+      center: d.vec3f(-1.25, 0, -1),
       radius: 0.4,
       materialType: MATERIAL_DIELECTRIC,
       materialIndex: 1,
     }),
     Sphere({
-      center: d.vec3f(1, 0, -1),
+      center: d.vec3f(1.25, 0, -1),
       radius: 0.5,
-      materialType: MATERIAL_METAL,
-      materialIndex: 0,
+      materialType: MATERIAL_LAMBERTIAN,
+      materialIndex: 1,
     }),
   ],
   lambertians: [
     Lambertian({ albedo: d.vec3f(0.8, 0.8, 0.0) }), // Ground
-    Lambertian({ albedo: d.vec3f(0.1, 0.2, 0.5) }), // Middle sphere
+    Lambertian({ albedo: d.vec3f(0.1, 0.2, 0.5) }), // Right sphere
   ],
   metals: [
-    Metal({ albedo: d.vec3f(0.8, 0.6, 0.2), fuzz: 1.0 }), // Right sphere
+    Metal({ albedo: d.vec3f(0.8, 0.6, 0.4), fuzz: 0.1 }), // Middle sphere
   ],
   dielectrics: [
     Dielectric({ refractionIndex: 1.5 }),     // Left sphere (outside)
