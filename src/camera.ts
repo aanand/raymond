@@ -3,13 +3,14 @@ import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
+import type { World } from "./world";
 
 export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas }: {
   aspectRatio: number,
   imageWidth: number,
   samplesPerPixel: number,
   maxBounceDepth: number,
-  world: d.Infer<typeof Sphere>[],
+  world: World,
   canvas: HTMLCanvasElement,
 }) => {
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
@@ -83,7 +84,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     });
 
     const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const result = rayTrace(ray, world, floor(randomFloat * 1000), 1000);
+    const result = rayTrace(ray, floor(randomFloat * 1000), 1000);
 
     state.$.currentSample[pixelIndex] = d.vec3f(result.color);
     state.$.bounces[pixelIndex] = Bounce(result.bounce);
@@ -99,7 +100,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
 
     const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const bounceResult = rayTrace(bounce.ray, world, floor(randomFloat * 1000), 1000);
+    const bounceResult = rayTrace(bounce.ray, floor(randomFloat * 1000), 1000);
     const currentValue = state.$.currentSample[pixelIndex];
 
     state.$.currentSample[pixelIndex] = d.vec3f(
@@ -173,15 +174,15 @@ const RayTraceResult = d.struct({
   bounce: Bounce,
 });
 
-function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
-  const World = d.arrayOf(Sphere, world.length);
+function buildRayTraceFunction(world: World) {
+  const spheres = tgpu.const(d.arrayOf(Sphere, world.spheres.length), world.spheres);
 
-  const hitWorld = tgpu.fn([World, Ray, Interval], HitRecord)((world, ray, rayT) => {
+  const hitWorld = tgpu.fn([Ray, Interval], HitRecord)((ray, rayT) => {
     let hitRecord = didNotHit();
     let closestSoFar = rayT.max;
 
-    for (let i = 0; i < world.length; i++) {
-      const sphereHit = hitSphere(world[i], ray, interval(rayT.min, closestSoFar));
+    for (let i = 0; i < spheres.$.length; i++) {
+      const sphereHit = hitSphere(spheres.$[i], ray, interval(rayT.min, closestSoFar));
       if (sphereHit.isHit) {
         hitRecord = HitRecord(sphereHit);
         closestSoFar = sphereHit.t;
@@ -191,8 +192,8 @@ function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
     return hitRecord;
   });
 
-  return tgpu.fn([Ray, World, d.f32, d.f32], RayTraceResult)((ray, world, i, samples) => {
-    const hitRecord = hitWorld(world, ray, interval(0.001, INF));
+  return tgpu.fn([Ray, d.f32, d.f32], RayTraceResult)((ray, i, samples) => {
+    const hitRecord = hitWorld(ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
       const color = d.vec3f(0.5, 0.5, 0.5);

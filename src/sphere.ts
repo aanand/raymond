@@ -5,6 +5,8 @@ import { Ray, Interval, HitRecord, didNotHit, surrounds, at } from "./utils";
 export const Sphere = d.struct({
   center: d.vec3f,
   radius: d.f32,
+  materialType: d.u32,
+  materialIndex: d.u32,
 });
 
 export const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ray, rayT) => {
