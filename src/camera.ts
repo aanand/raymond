@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
+import { floor, length, normalize, pack4x8unorm, sqrt } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
@@ -194,7 +194,7 @@ function buildRayTraceFunction(world: d.Infer<typeof Sphere>[]) {
 
     if (hitRecord.isHit) {
       const color = d.vec3f(0.5, 0.5, 0.5);
-      const bounceDirection = hitRecord.normal.add(randomUnitVector(i, samples));
+      const bounceDirection = normalize(hitRecord.normal.add(randomUnitVector(i, samples)));
       const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
       return RayTraceResult({
         color,
