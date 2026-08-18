@@ -1,14 +1,15 @@
 import tgpu, { d } from "typegpu";
-import { normalize, pack4x8unorm, sqrt } from "typegpu/std";
+import { normalize, pack4x8unorm, radians, sqrt, tan } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce } from "./utils";
 import type { World } from "./world";
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterDielectric, scatterLambertian, scatterMetal } from "./material";
 
-export const createScene = async ({ aspectRatio, imageWidth, samplesPerPixel, samplesPerPass, maxBounceDepth, world }: {
+export const createScene = async ({ aspectRatio, imageWidth, vfov, samplesPerPixel, samplesPerPass, maxBounceDepth, world }: {
   aspectRatio: number,
   imageWidth: number,
+  vfov: number,
   samplesPerPixel: number,
   samplesPerPass: number,
   maxBounceDepth: number,
@@ -17,7 +18,9 @@ export const createScene = async ({ aspectRatio, imageWidth, samplesPerPixel, sa
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
 
   const focalLength = d.f32(1.0);
-  const viewportHeight = d.f32(2.0);
+  const theta = radians(vfov);
+  const h = tan(theta/2.0);
+  const viewportHeight = 2.0 * h * focalLength;
   const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
   const cameraCenter = d.vec3f(0, 0, 0);
 

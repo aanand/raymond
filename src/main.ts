@@ -10,6 +10,7 @@ import './style.css';
 
 const aspectRatio = 16.0/9.0;
 const imageWidth = 800;
+const vfov = 90;
 const samplesPerPixel = 2000;
 const samplesPerPass = 20;
 const maxBounceDepth = 10;
@@ -65,6 +66,7 @@ const canvas = initializeCanvas();
 const render = await createScene({
   aspectRatio,
   imageWidth,
+  vfov,
   samplesPerPixel,
   samplesPerPass,
   maxBounceDepth,
