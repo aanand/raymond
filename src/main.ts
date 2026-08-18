@@ -4,7 +4,7 @@ import { Sphere } from './sphere';
 import { createScene } from './camera';
 
 import type { World } from './world';
-import { Lambertian, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
+import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
 
 import './style.css';
 
@@ -31,14 +31,14 @@ const world: World = {
     Sphere({
       center: d.vec3f(-1, 0, -1),
       radius: 0.5,
-      materialType: MATERIAL_METAL,
+      materialType: MATERIAL_DIELECTRIC,
       materialIndex: 0,
     }),
     Sphere({
       center: d.vec3f(1, 0, -1),
       radius: 0.5,
       materialType: MATERIAL_METAL,
-      materialIndex: 1,
+      materialIndex: 0,
     }),
   ],
   lambertians: [
@@ -46,9 +46,11 @@ const world: World = {
     Lambertian({ albedo: d.vec3f(0.1, 0.2, 0.5) }), // Middle sphere
   ],
   metals: [
-    Metal({ albedo: d.vec3f(0.8, 0.8, 0.8), fuzz: 0.3 }), // Left sphere
     Metal({ albedo: d.vec3f(0.8, 0.6, 0.2), fuzz: 1.0 }), // Right sphere
   ],
+  dielectrics: [
+    Dielectric({ refractionIndex: 1.50 }), // Left sphere
+  ]
 }
 
 const canvas = initializeCanvas();

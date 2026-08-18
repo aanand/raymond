@@ -4,7 +4,7 @@ import { normalize, pack4x8unorm, sqrt } from "typegpu/std";
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce } from "./utils";
 import type { World } from "./world";
-import { Lambertian, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterLambertian, scatterMetal } from "./material";
+import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterDielectric, scatterLambertian, scatterMetal } from "./material";
 
 export const createScene = async ({ aspectRatio, imageWidth, samplesPerPixel, samplesPerPass, maxBounceDepth, world }: {
   aspectRatio: number,
@@ -196,6 +196,9 @@ function buildRayTraceFunction(world: World) {
   const spheres = tgpu.const(d.arrayOf(Sphere, world.spheres.length), world.spheres);
   const lambertians = tgpu.const(d.arrayOf(Lambertian, world.lambertians.length), world.lambertians);
   const metals = tgpu.const(d.arrayOf(Metal, world.metals.length), world.metals);
+  const dielectrics = tgpu.const(d.arrayOf(Dielectric, world.dielectrics.length), world.dielectrics);
+
+  console.log({ lambertians, metals, dielectrics });
 
   const hitWorld = tgpu.fn([Ray, Interval], HitRecord)((ray, rayT) => {
     let hitRecord = didNotHit();
@@ -223,6 +226,9 @@ function buildRayTraceFunction(world: World) {
       } else if (hitRecord.materialType === MATERIAL_METAL) {
         const metal = metals.$[hitRecord.materialIndex];
         bounce = scatterMetal(metal, ray, hitRecord, randomFloat);
+      } else if (hitRecord.materialType === MATERIAL_DIELECTRIC) {
+        const dielectric = dielectrics.$[hitRecord.materialIndex];
+        bounce = scatterDielectric(dielectric, ray, hitRecord);
       }
 
       let color = d.vec3f(0, 0, 0);
