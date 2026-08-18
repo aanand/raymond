@@ -228,7 +228,7 @@ function buildRayTraceFunction(world: World) {
         bounce = scatterMetal(metal, ray, hitRecord, randomFloat);
       } else if (hitRecord.materialType === MATERIAL_DIELECTRIC) {
         const dielectric = dielectrics.$[hitRecord.materialIndex];
-        bounce = scatterDielectric(dielectric, ray, hitRecord);
+        bounce = scatterDielectric(dielectric, ray, hitRecord, randomFloat);
       }
 
       let color = d.vec3f(0, 0, 0);

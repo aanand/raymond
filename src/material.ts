@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { dot, normalize, reflect, refract } from "typegpu/std";
+import { dot, min, normalize, pow, reflect, refract, sqrt } from "typegpu/std";
 
 import { Bounce, didNotBounce, HitRecord, randomUnitVector, Ray } from "./utils";
 
@@ -46,15 +46,29 @@ export const Dielectric = d.struct({
   refractionIndex: d.f32,
 });
 
-export const scatterDielectric = tgpu.fn([Dielectric, Ray, HitRecord], Bounce)((dielectric, ray, hitRecord) => {
+export const scatterDielectric = tgpu.fn([Dielectric, Ray, HitRecord, d.f32], Bounce)((dielectric, ray, hitRecord, randomFloat) => {
   const ri = hitRecord.isFrontFace ? (1.0/dielectric.refractionIndex) : dielectric.refractionIndex;
+
   const unitDirection = normalize(ray.direction);
-  const refracted = refract(unitDirection, hitRecord.normal, ri);
-  const bouncedRay = Ray({ origin: hitRecord.position, direction: refracted });
+  const cosTheta = min(dot(unitDirection.mul(-1.0), hitRecord.normal), 1.0);
+  const sinTheta = sqrt(1.0 - cosTheta*cosTheta);
+
+  const cannotRefract = ri * sinTheta > 1.0;
+
+  const direction = (cannotRefract || reflectance(cosTheta, ri) > randomFloat) ?
+    reflect(unitDirection, hitRecord.normal) :
+    refract(unitDirection, hitRecord.normal, ri);
+
+  const bouncedRay = Ray({ origin: hitRecord.position, direction });
 
   return Bounce({
     didBounce: 1,
     ray: bouncedRay,
     attenuation: d.vec3f(1, 1, 1),
   });
+});
+
+const reflectance = tgpu.fn([d.f32, d.f32], d.f32)((cosine, refractionIndex) => {
+  const r0 = pow((1.0 - refractionIndex) / (1.0 + refractionIndex), 2);
+  return r0 + (1.0 - r0) * pow(1 - cosine, 5);
 });

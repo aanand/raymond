@@ -35,6 +35,12 @@ const world: World = {
       materialIndex: 0,
     }),
     Sphere({
+      center: d.vec3f(-1, 0, -1),
+      radius: 0.4,
+      materialType: MATERIAL_DIELECTRIC,
+      materialIndex: 1,
+    }),
+    Sphere({
       center: d.vec3f(1, 0, -1),
       radius: 0.5,
       materialType: MATERIAL_METAL,
@@ -49,7 +55,8 @@ const world: World = {
     Metal({ albedo: d.vec3f(0.8, 0.6, 0.2), fuzz: 1.0 }), // Right sphere
   ],
   dielectrics: [
-    Dielectric({ refractionIndex: 1.50 }), // Left sphere
+    Dielectric({ refractionIndex: 1.5 }),     // Left sphere (outside)
+    Dielectric({ refractionIndex: 1.0/1.5 }), // Left sphere (inside)
   ]
 }
 
