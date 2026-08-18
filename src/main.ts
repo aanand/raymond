@@ -1,7 +1,7 @@
 import { d } from 'typegpu';
 
 import { Sphere } from './sphere';
-import { createScene } from './camera';
+import { createRenderer } from './renderer';
 
 import type { World } from './world';
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
@@ -85,7 +85,7 @@ let azimuth = Math.PI/4;
 let elevation = Math.PI/8;
 let lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
 
-const { render, setCameraProps } = await createScene({
+const { render, setCameraProps } = await createRenderer({
   aspectRatio,
   imageWidth,
 
