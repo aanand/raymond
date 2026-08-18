@@ -59,8 +59,6 @@ export const createScene = async ({
     .sub(viewportU.div(2))
     .sub(viewportV.div(2));
 
-  console.log({ cameraCenter, focalLength, viewportU, viewportV, viewportUpperLeft })
-
   const pixel00Loc = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).mul(0.5));
 
   const root = await tgpu.init();
@@ -226,8 +224,6 @@ function buildRayTraceFunction(world: World) {
   const lambertians = tgpu.const(d.arrayOf(Lambertian, world.lambertians.length), world.lambertians);
   const metals = tgpu.const(d.arrayOf(Metal, world.metals.length), world.metals);
   const dielectrics = tgpu.const(d.arrayOf(Dielectric, world.dielectrics.length), world.dielectrics);
-
-  console.log({ lambertians, metals, dielectrics });
 
   const hitWorld = tgpu.fn([Ray, Interval], HitRecord)((ray, rayT) => {
     let hitRecord = didNotHit();

@@ -32,8 +32,6 @@ let cameraDirection = d.vec3f(0, 0, cameraDistance);
 cameraDirection = rotateAxis(cameraDirection, d.vec3f(1, 0, 0), -elevation);
 cameraDirection = rotateAxis(cameraDirection, d.vec3f(0, 1, 0), -azimuth);
 
-console.log(cameraDirection);
-
 let lookFrom = lookAt.add(cameraDirection);
 
 const world: World = {
