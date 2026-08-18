@@ -7,16 +7,34 @@ import type { World } from './world';
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
 
 import './style.css';
+import { cos, cross, dot, mix, sin } from 'typegpu/std';
 
 const aspectRatio = 16.0/9.0;
 const imageWidth = 800;
-const vfov = 70;
-const lookFrom = d.vec3f(0, 0, 0.5);
+const vfov = 40;
 const lookAt = d.vec3f(0, 0, -1);
 const vup = d.vec3f(0, 1, 0);
 const samplesPerPixel = 2000;
 const samplesPerPass = 20;
 const maxBounceDepth = 10;
+
+// (0, 0) means (lookAt - lookFrom) = (0, 0, cameraDistance)
+// Positive azimuth moves the camera LEFT
+// Positive elevation moves the camera UP
+const cameraDistance = 3.5;
+let azimuth = Math.PI/4;
+let elevation = Math.PI/8;
+
+const rotateAxis = (v: d.v3f, axis: d.v3f, angleRadians: number) =>
+  mix(axis.mul(dot(axis, v)), v, cos(angleRadians)).add(cross(axis, v).mul(sin(angleRadians)));
+
+let cameraDirection = d.vec3f(0, 0, cameraDistance);
+cameraDirection = rotateAxis(cameraDirection, d.vec3f(1, 0, 0), -elevation);
+cameraDirection = rotateAxis(cameraDirection, d.vec3f(0, 1, 0), -azimuth);
+
+console.log(cameraDirection);
+
+let lookFrom = lookAt.add(cameraDirection);
 
 const world: World = {
   spheres: [
