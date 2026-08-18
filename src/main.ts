@@ -115,7 +115,7 @@ const movementSpeed = Math.PI / 256;
 
 let isMoving = false;
 canvas.addEventListener('mousedown', () => { isMoving = true });
-canvas.addEventListener('mouseup', () => { isMoving = false });
+window.addEventListener('mouseup', () => { isMoving = false });
 canvas.addEventListener('mousemove', event => {
   if (isMoving) {
     azimuth = (azimuth + event.movementX * movementSpeed) % (Math.PI * 2);
