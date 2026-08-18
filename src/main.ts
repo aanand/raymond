@@ -15,7 +15,13 @@ const world = d.arrayOf(Sphere, 2)([
   Sphere({ center: d.vec3f(0, -100.5, -1), radius:  100 }),
 ]);
 
-render({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas: initializeCanvas() });
+const canvas = initializeCanvas();
+
+const draw = () =>
+  render({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas });
+
+canvas.addEventListener('click', draw);
+draw();
 
 function initializeCanvas() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
