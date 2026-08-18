@@ -111,7 +111,7 @@ const updateCamera = () => {
 updateCamera();
 
 // Radians per pixel
-const movementSpeed = Math.PI / 64;
+const movementSpeed = Math.PI / 256;
 
 let isMoving = false;
 canvas.addEventListener('mousedown', () => { isMoving = true });
