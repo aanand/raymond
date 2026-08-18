@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { floor, length, normalize, pack4x8unorm, sqrt } from "typegpu/std";
+import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
