@@ -46,19 +46,19 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     return values;
   }
 
+  const pixelBuffer = root.createMutable(d.arrayOf(d.u32, numPixels));
+
   const state = root.createMutable(d.struct({
     sampleIndex: d.u32,
     currentSample: d.arrayOf(d.vec3f, numPixels),
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
     bounces: d.arrayOf(Bounce, numPixels),
-    pixels: d.arrayOf(d.u32, numPixels),
     randomValues: d.arrayOf(d.u32, numRandomValues),
   }), {
     sampleIndex: 0,
     currentSample: new Float32Array(numPixels * 4),
     accumulatedSamples: new Float32Array(numPixels * 4),
     bounces: Array.from({ length: 100 }).map(didNotBounce),
-    pixels: new Uint32Array(numPixels),
     randomValues: new Uint32Array(numRandomValues),
   });
 
@@ -148,7 +148,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
   const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
     const accumulation = state.$.accumulatedSamples[pixelIndex];
-    state.$.pixels[pixelIndex] = pack4x8unorm(d.vec4f(
+    pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
       linearToGamma(accumulation[0] / accumulation[3]),
       linearToGamma(accumulation[1] / accumulation[3]),
       linearToGamma(accumulation[2] / accumulation[3]),
@@ -158,12 +158,14 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
   writePixels.dispatchThreads(numPixels);
   console.timeEnd('Render');
 
-  const value = await state.read();
-  const imageData = new ImageData(new Uint8ClampedArray(new Uint32Array(value.pixels).buffer), imageWidth, imageHeight);
+  console.time('Draw to canvas');
+  const value = await pixelBuffer.read();
+  const imageData = new ImageData(new Uint8ClampedArray(new Uint32Array(value).buffer), imageWidth, imageHeight);
 
   canvas.width = imageWidth;
   canvas.height = imageHeight;
   canvas.getContext('2d')!.putImageData(imageData, 0, 0);
+  console.timeEnd('Draw to canvas');
 }
 
 const RayTraceResult = d.struct({
