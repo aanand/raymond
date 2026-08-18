@@ -6,14 +6,18 @@ import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didN
 import type { World } from "./world";
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterDielectric, scatterLambertian, scatterMetal } from "./material";
 
+type CameraProps = {
+  vfov: number,
+  lookFrom: d.v3f,
+  lookAt: d.v3f,
+  vup: d.v3f,
+}
+
 export const createScene = async ({
   aspectRatio,
   imageWidth,
   
-  vfov,
-  lookFrom,
-  lookAt,
-  vup,
+  cameraProps,
 
   samplesPerPixel,
   samplesPerPass,
@@ -24,10 +28,7 @@ export const createScene = async ({
   aspectRatio: number,
   imageWidth: number,
 
-  vfov: number,
-  lookFrom: d.v3f,
-  lookAt: d.v3f,
-  vup: d.v3f,
+  cameraProps: CameraProps,
 
   samplesPerPixel: number,
   samplesPerPass: number,
@@ -37,29 +38,40 @@ export const createScene = async ({
 }) => {
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
 
-  const cameraCenter = lookFrom;
-  const focalLength = length(lookFrom.sub(lookAt));
-  const theta = radians(vfov);
-  const h = tan(theta/2.0);
-  const viewportHeight = 2.0 * h * focalLength;
-  const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
+  const setupCamera = () => {
+    const center = cameraProps.lookFrom;
+    const focalLength = length(cameraProps.lookFrom.sub(cameraProps.lookAt));
+    const theta = radians(cameraProps.vfov);
+    const h = tan(theta/2.0);
+    const viewportHeight = 2.0 * h * focalLength;
+    const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
 
-  const w = normalize(lookFrom.sub(lookAt));
-  const u = normalize(cross(vup, w));
-  const v = cross(w, u);
+    const w = normalize(cameraProps.lookFrom.sub(cameraProps.lookAt));
+    const u = normalize(cross(cameraProps.vup, w));
+    const v = cross(w, u);
 
-  const viewportU = u.mul(viewportWidth);
-  const viewportV = v.mul(-viewportHeight);
+    const viewportU = u.mul(viewportWidth);
+    const viewportV = v.mul(-viewportHeight);
 
-  const pixelDeltaU = viewportU.div(imageWidth);
-  const pixelDeltaV = viewportV.div(imageHeight);
+    const pixelDeltaU = viewportU.div(imageWidth);
+    const pixelDeltaV = viewportV.div(imageHeight);
 
-  const viewportUpperLeft = cameraCenter
-    .sub(w.mul(focalLength))
-    .sub(viewportU.div(2))
-    .sub(viewportV.div(2));
+    const viewportUpperLeft = center
+      .sub(w.mul(focalLength))
+      .sub(viewportU.div(2))
+      .sub(viewportV.div(2));
 
-  const pixel00Loc = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).mul(0.5));
+    const pixel00Loc = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).mul(0.5));
+
+    return {
+      center,
+      pixel00Loc,
+      pixelDeltaU,
+      pixelDeltaV,
+    };
+  }
+
+  let camera = setupCamera();
 
   const root = await tgpu.init();
 
@@ -105,13 +117,13 @@ export const createScene = async ({
     const offsetX = noise(d.f32(x + state.$.sampleIndex), d.f32(y)) - 0.5;
     const offsetY = noise(d.f32(x), d.f32(y + state.$.sampleIndex)) - 0.5;
 
-    const pixelCenter = pixel00Loc
-      .add(pixelDeltaU.mul(d.f32(x) + offsetX))
-      .add(pixelDeltaV.mul(d.f32(y) + offsetY));
+    const pixelCenter = camera.pixel00Loc
+      .add(camera.pixelDeltaU.mul(d.f32(x) + offsetX))
+      .add(camera.pixelDeltaV.mul(d.f32(y) + offsetY));
 
     const ray = Ray({
-      origin: cameraCenter,
-      direction: pixelCenter.sub(cameraCenter)
+      origin: camera.center,
+      direction: pixelCenter.sub(camera.center)
     });
 
     const result = rayTrace(ray, randomFloat(pixelIndex));
@@ -204,7 +216,7 @@ export const createScene = async ({
 
   renderAllPasses();
 
-  return async (canvas: HTMLCanvasElement) => {
+  const render = async (canvas: HTMLCanvasElement) => {
     const value = await pixelBuffer.read();
     const imageData = new ImageData(new Uint8ClampedArray(new Uint32Array(value).buffer), imageWidth, imageHeight);
 
@@ -212,6 +224,12 @@ export const createScene = async ({
     canvas.height = imageHeight;
     canvas.getContext('2d')!.putImageData(imageData, 0, 0);
   }
+
+  const setCameraProps = (newProps: CameraProps) => {
+    cameraProps = newProps;
+  }
+
+  return { render, setCameraProps };
 }
 
 const RayTraceResult = d.struct({

@@ -82,14 +82,16 @@ const world: World = {
 
 const canvas = initializeCanvas();
 
-const render = await createScene({
+const { render } = await createScene({
   aspectRatio,
   imageWidth,
 
-  vfov,
-  lookFrom,
-  lookAt,
-  vup,
+  cameraProps: {
+    vfov,
+    lookFrom,
+    lookAt,
+    vup,
+  },
 
   samplesPerPixel,
   samplesPerPass,
