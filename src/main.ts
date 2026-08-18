@@ -7,7 +7,7 @@ import type { World } from './world';
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
 
 import './style.css';
-import { cos, cross, dot, mix, sin } from 'typegpu/std';
+import { clamp, cos, cross, dot, mix, sin } from 'typegpu/std';
 
 const aspectRatio = 16.0/9.0;
 const imageWidth = 800;
@@ -15,7 +15,7 @@ const vfov = 40;
 const lookAt = d.vec3f(0, 0, -1);
 const vup = d.vec3f(0, 1, 0);
 const samplesPerPixel = 2000;
-const samplesPerPass = 20;
+const samplesPerPass = 5;
 const maxBounceDepth = 10;
 
 const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: number, elevation: number) => {
@@ -103,16 +103,26 @@ const { render, setCameraProps } = await createScene({
   world,
 });
 
-const moveCamera = () => {
-  azimuth = Math.random() * Math.PI * 2;
-  elevation = Math.random() * Math.PI * 0.4;
+const updateCamera = () => {
   lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
-  console.log({ azimuth, elevation });
   setCameraProps({ vfov, lookFrom, lookAt, vup });
 };
 
-canvas.addEventListener('click', () => moveCamera());
-moveCamera();
+updateCamera();
+
+// Radians per pixel
+const movementSpeed = Math.PI / 64;
+
+let isMoving = false;
+canvas.addEventListener('mousedown', () => { isMoving = true });
+canvas.addEventListener('mouseup', () => { isMoving = false });
+canvas.addEventListener('mousemove', event => {
+  if (isMoving) {
+    azimuth = (azimuth + event.movementX * movementSpeed) % (Math.PI * 2);
+    elevation = clamp(elevation + event.movementY * movementSpeed, 0, Math.PI * 0.4);
+    updateCamera();
+  }
+});
 
 function frame() {
   render(canvas);

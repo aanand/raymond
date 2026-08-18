@@ -215,7 +215,6 @@ export const createScene = async ({
 
   function renderNextPass() {
     if (numSamplesTaken >= samplesPerPixel) {
-      console.log('Finished rendering');
       return;
     }
 
@@ -248,7 +247,6 @@ export const createScene = async ({
   }
 
   const setCameraProps = (newProps: CameraProps) => {
-    console.log(newProps.lookFrom);
     cameraProps = newProps;
     renderAllPasses();
   }
