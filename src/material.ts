@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { normalize } from "typegpu/std";
+import { normalize, reflect } from "typegpu/std";
 
 import { Bounce, HitRecord, randomUnitVector, Ray } from "./utils";
 
@@ -23,4 +23,15 @@ export const scatterLambertian = tgpu.fn([Lambertian, HitRecord, d.f32, d.f32], 
 
 export const Metal = d.struct({
   albedo: d.vec3f,
+});
+
+export const scatterMetal = tgpu.fn([Metal, Ray, HitRecord], Bounce)((metal, ray, hitRecord) => {
+  const reflected = reflect(ray.direction, hitRecord.normal);
+  const bouncedRay = Ray({ origin: hitRecord.position, direction: normalize(reflected) }); // normalize might not be necessary here?
+
+  return Bounce({
+    didBounce: 1,
+    ray: bouncedRay,
+    attenuation: metal.albedo,
+  });
 });

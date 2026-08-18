@@ -40,7 +40,7 @@ const world: World = {
     }),
   ],
   lambertians: [
-    Lambertian({ albedo: d.vec3f(0.8, 0.8, 0.8) }), // Ground
+    Lambertian({ albedo: d.vec3f(0.8, 0.8, 0.0) }), // Ground
     Lambertian({ albedo: d.vec3f(0.1, 0.2, 0.5) }), // Middle sphere
   ],
   metals: [

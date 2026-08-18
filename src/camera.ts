@@ -2,9 +2,9 @@ import tgpu, { d } from "typegpu";
 import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
-import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
+import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce } from "./utils";
 import type { World } from "./world";
-import { Lambertian, MATERIAL_LAMBERTIAN, Metal, scatterLambertian } from "./material";
+import { Lambertian, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterLambertian, scatterMetal } from "./material";
 
 export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas }: {
   aspectRatio: number,
@@ -204,10 +204,13 @@ function buildRayTraceFunction(world: World) {
       if (hitRecord.materialType === MATERIAL_LAMBERTIAN) {
         const lambertian = lambertians.$[hitRecord.materialIndex];
         bounce = scatterLambertian(lambertian, hitRecord, i, samples);
+      } else if (hitRecord.materialType === MATERIAL_METAL) {
+        const metal = metals.$[hitRecord.materialIndex];
+        bounce = scatterMetal(metal, ray, hitRecord);
       }
 
       let color = d.vec3f(0, 0, 0);
-      if (bounce.didBounce) {
+      if (d.bool(bounce.didBounce)) {
         color = d.vec3f(bounce.attenuation);
       }
 
