@@ -92,14 +92,9 @@ export const makeGpuFunctions = async ({
     'use gpu';
 
     const bounce = state.$.bounces[pixelIndex];
-
-    // const x = d.u32(pixelIndex % imageWidth);
-    // const y = d.u32(pixelIndex / imageWidth);
-    // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
-
     const bounceResult = rayTrace(bounce.ray, randomFloat(pixelIndex));
-    const currentValue = state.$.currentSample[pixelIndex];
 
+    const currentValue = state.$.currentSample[pixelIndex];
     state.$.currentSample[pixelIndex] = d.vec3f(
       bounce.didBounce ? currentValue[0] * bounceResult.color[0] : currentValue[0],
       bounce.didBounce ? currentValue[1] * bounceResult.color[1] : currentValue[1],
