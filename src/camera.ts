@@ -64,6 +64,9 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     randomValues: new Uint32Array(numRandomValues),
   });
 
+  const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex =>
+    state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF);
+
   const fireInitialRays = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
 
@@ -84,8 +87,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
       direction: pixelCenter.sub(cameraCenter)
     });
 
-    const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const result = rayTrace(ray, randomFloat);
+    const result = rayTrace(ray, randomFloat(pixelIndex));
 
     state.$.currentSample[pixelIndex] = d.vec3f(result.color);
     state.$.bounces[pixelIndex] = Bounce(result.bounce);
@@ -100,8 +102,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     // const y = d.u32(pixelIndex / imageWidth);
     // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
 
-    const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const bounceResult = rayTrace(bounce.ray, randomFloat);
+    const bounceResult = rayTrace(bounce.ray, randomFloat(pixelIndex));
     const currentValue = state.$.currentSample[pixelIndex];
 
     state.$.currentSample[pixelIndex] = d.vec3f(
