@@ -44,8 +44,8 @@ const world: World = {
     Lambertian({ albedo: d.vec3f(0.1, 0.2, 0.5) }), // Middle sphere
   ],
   metals: [
-    Metal({ albedo: d.vec3f(0.8, 0.8, 0.8) }), // Left sphere
-    Metal({ albedo: d.vec3f(0.8, 0.6, 0.2) }), // Right sphere
+    Metal({ albedo: d.vec3f(0.8, 0.8, 0.8), fuzz: 0.3 }), // Left sphere
+    Metal({ albedo: d.vec3f(0.8, 0.6, 0.2), fuzz: 1.0 }), // Right sphere
   ],
 }
 

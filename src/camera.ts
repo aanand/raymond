@@ -207,7 +207,7 @@ function buildRayTraceFunction(world: World) {
         bounce = scatterLambertian(lambertian, hitRecord, randomFloat);
       } else if (hitRecord.materialType === MATERIAL_METAL) {
         const metal = metals.$[hitRecord.materialIndex];
-        bounce = scatterMetal(metal, ray, hitRecord);
+        bounce = scatterMetal(metal, ray, hitRecord, randomFloat);
       }
 
       let color = d.vec3f(0, 0, 0);
