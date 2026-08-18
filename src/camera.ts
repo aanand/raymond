@@ -1,39 +1,65 @@
 import tgpu, { d } from "typegpu";
-import { normalize, pack4x8unorm, radians, sqrt, tan } from "typegpu/std";
+import { cross, length, normalize, pack4x8unorm, radians, sqrt, tan } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce } from "./utils";
 import type { World } from "./world";
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterDielectric, scatterLambertian, scatterMetal } from "./material";
 
-export const createScene = async ({ aspectRatio, imageWidth, vfov, samplesPerPixel, samplesPerPass, maxBounceDepth, world }: {
+export const createScene = async ({
+  aspectRatio,
+  imageWidth,
+  
+  vfov,
+  lookFrom,
+  lookAt,
+  vup,
+
+  samplesPerPixel,
+  samplesPerPass,
+  maxBounceDepth,
+  
+  world,
+}: {
   aspectRatio: number,
   imageWidth: number,
+
   vfov: number,
+  lookFrom: d.v3f,
+  lookAt: d.v3f,
+  vup: d.v3f,
+
   samplesPerPixel: number,
   samplesPerPass: number,
   maxBounceDepth: number,
+
   world: World,
 }) => {
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
 
-  const focalLength = d.f32(1.0);
+  const cameraCenter = lookFrom;
+  const focalLength = length(lookFrom.sub(lookAt));
   const theta = radians(vfov);
   const h = tan(theta/2.0);
   const viewportHeight = 2.0 * h * focalLength;
   const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
-  const cameraCenter = d.vec3f(0, 0, 0);
 
-  const viewportU = d.vec3f(viewportWidth, 0, 0);
-  const viewportV = d.vec3f(0, -viewportHeight, 0);
+  const w = normalize(lookFrom.sub(lookAt));
+  const u = normalize(cross(vup, w));
+  const v = cross(w, u);
+
+  const viewportU = u.mul(viewportWidth);
+  const viewportV = v.mul(-viewportHeight);
 
   const pixelDeltaU = viewportU.div(imageWidth);
   const pixelDeltaV = viewportV.div(imageHeight);
 
   const viewportUpperLeft = cameraCenter
-    .sub(d.vec3f(0, 0, focalLength))
+    .sub(w.mul(focalLength))
     .sub(viewportU.div(2))
     .sub(viewportV.div(2));
+
+  console.log({ cameraCenter, focalLength, viewportU, viewportV, viewportUpperLeft })
 
   const pixel00Loc = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).mul(0.5));
 
