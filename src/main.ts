@@ -1,15 +1,17 @@
 import { d } from 'typegpu';
 
 import { Sphere } from './sphere';
-import { render } from './camera';
+import { createScene } from './camera';
 
-import './style.css';
 import type { World } from './world';
 import { Lambertian, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
 
-const aspectRatio = d.f32(16.0/9.0);
-const imageWidth = d.u32(800);
-const samplesPerPixel = d.u32(40);
+import './style.css';
+
+const aspectRatio = 16.0/9.0;
+const imageWidth = 800;
+const samplesPerPixel = 2000;
+const samplesPerPass = 20;
 const maxBounceDepth = 10;
 
 const world: World = {
@@ -51,11 +53,21 @@ const world: World = {
 
 const canvas = initializeCanvas();
 
-const draw = () =>
-  render({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas });
+const render = await createScene({
+  aspectRatio,
+  imageWidth,
+  samplesPerPixel,
+  samplesPerPass,
+  maxBounceDepth,
+  world,
+});
 
-canvas.addEventListener('click', draw);
-draw();
+function frame() {
+  render(canvas);
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
 
 function initializeCanvas() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `

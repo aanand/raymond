@@ -6,13 +6,13 @@ import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didN
 import type { World } from "./world";
 import { Lambertian, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal, scatterLambertian, scatterMetal } from "./material";
 
-export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas }: {
+export const createScene = async ({ aspectRatio, imageWidth, samplesPerPixel, samplesPerPass, maxBounceDepth, world }: {
   aspectRatio: number,
   imageWidth: number,
   samplesPerPixel: number,
+  samplesPerPass: number,
   maxBounceDepth: number,
   world: World,
-  canvas: HTMLCanvasElement,
 }) => {
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
 
@@ -128,48 +128,63 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     ));
   });
 
-  console.time('Render');
-  for (let s = 0; s < samplesPerPixel; s++) {
-    state.patch({ sampleIndex: s, randomValues: generateRandomValues() });
-    fireInitialRays.dispatchThreads(numPixels);
+  function renderOnePass() {
+    for (let s = 0; s < samplesPerPass; s++) {
+      state.patch({ sampleIndex: s, randomValues: generateRandomValues() });
+      fireInitialRays.dispatchThreads(numPixels);
 
-    for (let i = 0; i < maxBounceDepth; i++) {
-      state.patch({ randomValues: generateRandomValues() });
-      processBounces.dispatchThreads(numPixels);
+      for (let i = 0; i < maxBounceDepth; i++) {
+        state.patch({ randomValues: generateRandomValues() });
+        processBounces.dispatchThreads(numPixels);
+      }
+
+      accumulateCurrentSample.dispatchThreads(numPixels);
     }
 
-    accumulateCurrentSample.dispatchThreads(numPixels);
+    const linearToGamma = tgpu.fn([d.f32], d.f32)(linear => {
+      if (linear > 0) {
+        return sqrt(linear);
+      }
+
+      return 0;
+    });
+
+    const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
+      'use gpu';
+      const accumulation = state.$.accumulatedSamples[pixelIndex];
+      pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
+        linearToGamma(accumulation[0] / accumulation[3]),
+        linearToGamma(accumulation[1] / accumulation[3]),
+        linearToGamma(accumulation[2] / accumulation[3]),
+        1.0
+      ));
+    });
+    writePixels.dispatchThreads(numPixels);
   }
 
-  const linearToGamma = tgpu.fn([d.f32], d.f32)(linear => {
-    if (linear > 0) {
-      return sqrt(linear);
+  let numSamplesTaken = 0;
+  function renderAllPasses() {
+    if (numSamplesTaken >= samplesPerPixel) {
+      console.log('Finished rendering');
+      return;
     }
 
-    return 0;
-  });
+    renderOnePass();
+    numSamplesTaken += samplesPerPass;
 
-  const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
-    'use gpu';
-    const accumulation = state.$.accumulatedSamples[pixelIndex];
-    pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
-      linearToGamma(accumulation[0] / accumulation[3]),
-      linearToGamma(accumulation[1] / accumulation[3]),
-      linearToGamma(accumulation[2] / accumulation[3]),
-      1.0
-    ));
-  });
-  writePixels.dispatchThreads(numPixels);
-  console.timeEnd('Render');
+    setTimeout(renderAllPasses, 0);
+  }
 
-  console.time('Draw to canvas');
-  const value = await pixelBuffer.read();
-  const imageData = new ImageData(new Uint8ClampedArray(new Uint32Array(value).buffer), imageWidth, imageHeight);
+  renderAllPasses();
 
-  canvas.width = imageWidth;
-  canvas.height = imageHeight;
-  canvas.getContext('2d')!.putImageData(imageData, 0, 0);
-  console.timeEnd('Draw to canvas');
+  return async (canvas: HTMLCanvasElement) => {
+    const value = await pixelBuffer.read();
+    const imageData = new ImageData(new Uint8ClampedArray(new Uint32Array(value).buffer), imageWidth, imageHeight);
+
+    canvas.width = imageWidth;
+    canvas.height = imageHeight;
+    canvas.getContext('2d')!.putImageData(imageData, 0, 0);
+  }
 }
 
 const RayTraceResult = d.struct({
