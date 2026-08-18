@@ -18,21 +18,16 @@ const samplesPerPixel = 2000;
 const samplesPerPass = 20;
 const maxBounceDepth = 10;
 
-// (0, 0) means (lookAt - lookFrom) = (0, 0, cameraDistance)
-// Positive azimuth moves the camera LEFT
-// Positive elevation moves the camera UP
-const cameraDistance = 3.5;
-let azimuth = Math.PI/4;
-let elevation = Math.PI/8;
+const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: number, elevation: number) => {
+  const rotateAxis = (v: d.v3f, axis: d.v3f, angleRadians: number) =>
+    mix(axis.mul(dot(axis, v)), v, cos(angleRadians)).add(cross(axis, v).mul(sin(angleRadians)));
 
-const rotateAxis = (v: d.v3f, axis: d.v3f, angleRadians: number) =>
-  mix(axis.mul(dot(axis, v)), v, cos(angleRadians)).add(cross(axis, v).mul(sin(angleRadians)));
+  let cameraDirection = d.vec3f(0, 0, cameraDistance);
+  cameraDirection = rotateAxis(cameraDirection, d.vec3f(1, 0, 0), -elevation);
+  cameraDirection = rotateAxis(cameraDirection, d.vec3f(0, 1, 0), -azimuth);
 
-let cameraDirection = d.vec3f(0, 0, cameraDistance);
-cameraDirection = rotateAxis(cameraDirection, d.vec3f(1, 0, 0), -elevation);
-cameraDirection = rotateAxis(cameraDirection, d.vec3f(0, 1, 0), -azimuth);
-
-let lookFrom = lookAt.add(cameraDirection);
+  return lookAt.add(cameraDirection);
+}
 
 const world: World = {
   spheres: [
@@ -82,7 +77,15 @@ const world: World = {
 
 const canvas = initializeCanvas();
 
-const { render } = await createScene({
+// (0, 0) means (lookAt - lookFrom) = (0, 0, cameraDistance)
+// Positive azimuth moves the camera LEFT
+// Positive elevation moves the camera UP
+const cameraDistance = 3.5;
+let azimuth = Math.PI/4;
+let elevation = Math.PI/8;
+let lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
+
+const { render, setCameraProps } = await createScene({
   aspectRatio,
   imageWidth,
 
@@ -99,6 +102,17 @@ const { render } = await createScene({
 
   world,
 });
+
+const moveCamera = () => {
+  azimuth = Math.random() * Math.PI * 2;
+  elevation = Math.random() * Math.PI * 0.4;
+  lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
+  console.log({ azimuth, elevation });
+  setCameraProps({ vfov, lookFrom, lookAt, vup });
+};
+
+canvas.addEventListener('click', () => moveCamera());
+moveCamera();
 
 function frame() {
   render(canvas);

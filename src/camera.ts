@@ -37,8 +37,26 @@ export const createScene = async ({
   world: World,
 }) => {
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
+  const numPixels = imageWidth * imageHeight;
 
-  const setupCamera = () => {
+  const root = await tgpu.init();
+  const rayTrace = buildRayTraceFunction(world);
+  const numRandomValues = Math.floor(65536 / Uint32Array.BYTES_PER_ELEMENT);
+
+  const generateRandomValues = () => {
+    const values = new Uint32Array(numRandomValues);
+    crypto.getRandomValues(values);
+    return values;
+  }
+
+  const Camera = d.struct({
+    center: d.vec3f,
+    pixel00Loc: d.vec3f,
+    pixelDeltaU: d.vec3f,
+    pixelDeltaV: d.vec3f,
+  });
+
+  const setupCamera = (): d.Infer<typeof Camera> => {
     const center = cameraProps.lookFrom;
     const focalLength = length(cameraProps.lookFrom.sub(cameraProps.lookAt));
     const theta = radians(cameraProps.vfov);
@@ -71,37 +89,27 @@ export const createScene = async ({
     };
   }
 
-  let camera = setupCamera();
-
-  const root = await tgpu.init();
-
-  const rayTrace = buildRayTraceFunction(world);
-
-  const numPixels = imageWidth * imageHeight;
-
-  const numRandomValues = Math.floor(65536 / Uint32Array.BYTES_PER_ELEMENT);
-
-  const generateRandomValues = () => {
-    const values = new Uint32Array(numRandomValues);
-    crypto.getRandomValues(values);
-    return values;
-  }
-
   const pixelBuffer = root.createMutable(d.arrayOf(d.u32, numPixels));
 
-  const state = root.createMutable(d.struct({
+  const stateStruct = d.struct({
+    camera: Camera,
     sampleIndex: d.u32,
     currentSample: d.arrayOf(d.vec3f, numPixels),
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
     bounces: d.arrayOf(Bounce, numPixels),
     randomValues: d.arrayOf(d.u32, numRandomValues),
-  }), {
+  });
+
+  const initialState = () => ({
+    camera: setupCamera(),
     sampleIndex: 0,
     currentSample: new Float32Array(numPixels * 4),
     accumulatedSamples: new Float32Array(numPixels * 4),
     bounces: Array.from({ length: 100 }).map(didNotBounce),
     randomValues: new Uint32Array(numRandomValues),
   });
+
+  const state = root.createMutable(stateStruct, initialState());
 
   const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex =>
     state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF);
@@ -117,13 +125,13 @@ export const createScene = async ({
     const offsetX = noise(d.f32(x + state.$.sampleIndex), d.f32(y)) - 0.5;
     const offsetY = noise(d.f32(x), d.f32(y + state.$.sampleIndex)) - 0.5;
 
-    const pixelCenter = camera.pixel00Loc
-      .add(camera.pixelDeltaU.mul(d.f32(x) + offsetX))
-      .add(camera.pixelDeltaV.mul(d.f32(y) + offsetY));
+    const pixelCenter = state.$.camera.pixel00Loc
+      .add(state.$.camera.pixelDeltaU.mul(d.f32(x) + offsetX))
+      .add(state.$.camera.pixelDeltaV.mul(d.f32(y) + offsetY));
 
     const ray = Ray({
-      origin: camera.center,
-      direction: pixelCenter.sub(camera.center)
+      origin: state.$.camera.center,
+      direction: pixelCenter.sub(state.$.camera.center)
     });
 
     const result = rayTrace(ray, randomFloat(pixelIndex));
@@ -167,6 +175,25 @@ export const createScene = async ({
     ));
   });
 
+  const linearToGamma = tgpu.fn([d.f32], d.f32)(linear => {
+    if (linear > 0) {
+      return sqrt(linear);
+    }
+
+    return 0;
+  });
+
+  const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
+    'use gpu';
+    const accumulation = state.$.accumulatedSamples[pixelIndex];
+    pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
+      linearToGamma(accumulation[0] / accumulation[3]),
+      linearToGamma(accumulation[1] / accumulation[3]),
+      linearToGamma(accumulation[2] / accumulation[3]),
+      1.0
+    ));
+  });
+
   function renderOnePass() {
     for (let s = 0; s < samplesPerPass; s++) {
       state.patch({ sampleIndex: s, randomValues: generateRandomValues() });
@@ -180,29 +207,13 @@ export const createScene = async ({
       accumulateCurrentSample.dispatchThreads(numPixels);
     }
 
-    const linearToGamma = tgpu.fn([d.f32], d.f32)(linear => {
-      if (linear > 0) {
-        return sqrt(linear);
-      }
-
-      return 0;
-    });
-
-    const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
-      'use gpu';
-      const accumulation = state.$.accumulatedSamples[pixelIndex];
-      pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
-        linearToGamma(accumulation[0] / accumulation[3]),
-        linearToGamma(accumulation[1] / accumulation[3]),
-        linearToGamma(accumulation[2] / accumulation[3]),
-        1.0
-      ));
-    });
     writePixels.dispatchThreads(numPixels);
   }
 
   let numSamplesTaken = 0;
-  function renderAllPasses() {
+  let nextPassTimeout = 0;
+
+  function renderNextPass() {
     if (numSamplesTaken >= samplesPerPixel) {
       console.log('Finished rendering');
       return;
@@ -211,10 +222,21 @@ export const createScene = async ({
     renderOnePass();
     numSamplesTaken += samplesPerPass;
 
-    setTimeout(renderAllPasses, 0);
+    nextPassTimeout = setTimeout(renderNextPass, 0);
   }
 
-  renderAllPasses();
+  function renderAllPasses() {
+    numSamplesTaken = 0;
+
+    if (nextPassTimeout) {
+      clearTimeout(nextPassTimeout);
+      nextPassTimeout = 0;
+    }
+
+    state.write(initialState());
+
+    renderNextPass();
+  }
 
   const render = async (canvas: HTMLCanvasElement) => {
     const value = await pixelBuffer.read();
@@ -226,8 +248,12 @@ export const createScene = async ({
   }
 
   const setCameraProps = (newProps: CameraProps) => {
+    console.log(newProps.lookFrom);
     cameraProps = newProps;
+    renderAllPasses();
   }
+
+  renderAllPasses();
 
   return { render, setCameraProps };
 }
