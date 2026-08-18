@@ -38,5 +38,13 @@ export const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ra
   // const normal = isFrontFace ? outwardNormal : outwardNormal.mul(-1);
   const normal = select(outwardNormal.mul(-1), outwardNormal, isFrontFace);
 
-  return HitRecord({ isHit: true, position, normal, t, isFrontFace });
+  return HitRecord({
+    isHit: true,
+    position,
+    normal,
+    t,
+    isFrontFace,
+    materialType: sphere.materialType,
+    materialIndex: sphere.materialIndex,
+  });
 });

@@ -28,6 +28,8 @@ export const HitRecord = d.struct({
   normal: d.vec3f,
   t: d.f32,
   isFrontFace: d.bool,
+  materialType: d.u32,
+  materialIndex: d.u32,
 });
 
 export const didNotHit = () => {
@@ -38,6 +40,8 @@ export const didNotHit = () => {
     normal: d.vec3f(0, 0, 1),
     t: 0,
     isFrontFace: false,
+    materialType: 0,
+    materialIndex: 0,
   });
 }
 
@@ -46,6 +50,7 @@ export const Bounce = d.struct({
   // Compared to d.bool, this is both host-shareable and easy to sum.
   didBounce: d.u32,
   ray: Ray,
+  attenuation: d.vec3f,
 });
 
 export const didNotBounce = () => {
@@ -53,6 +58,7 @@ export const didNotBounce = () => {
   return Bounce({
     didBounce: 0,
     ray: Ray({ origin: d.vec3f(0, 0, 0), direction: d.vec3f(0, 0, 1) }),
+    attenuation: d.vec3f(1, 1, 1),
   });
 }
 

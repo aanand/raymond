@@ -4,6 +4,7 @@ import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce, randomUnitVector } from "./utils";
 import type { World } from "./world";
+import { Lambertian, MATERIAL_LAMBERTIAN, Metal, scatterLambertian } from "./material";
 
 export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBounceDepth, world, canvas }: {
   aspectRatio: number,
@@ -112,6 +113,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     state.$.bounces[pixelIndex] = Bounce({
       didBounce: bounceResult.bounce.didBounce,
       ray: bounceResult.bounce.ray,
+      attenuation: bounceResult.bounce.attenuation,
     });
   });
 
@@ -176,6 +178,8 @@ const RayTraceResult = d.struct({
 
 function buildRayTraceFunction(world: World) {
   const spheres = tgpu.const(d.arrayOf(Sphere, world.spheres.length), world.spheres);
+  const lambertians = tgpu.const(d.arrayOf(Lambertian, world.lambertians.length), world.lambertians);
+  const metals = tgpu.const(d.arrayOf(Metal, world.metals.length), world.metals);
 
   const hitWorld = tgpu.fn([Ray, Interval], HitRecord)((ray, rayT) => {
     let hitRecord = didNotHit();
@@ -196,13 +200,18 @@ function buildRayTraceFunction(world: World) {
     const hitRecord = hitWorld(ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
-      const color = d.vec3f(0.5, 0.5, 0.5);
-      const bounceDirection = normalize(hitRecord.normal.add(randomUnitVector(i, samples)));
-      const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
-      return RayTraceResult({
-        color,
-        bounce: Bounce({ didBounce: 1, ray: bouncedRay }),
-      });
+      let bounce = didNotBounce();
+      if (hitRecord.materialType === MATERIAL_LAMBERTIAN) {
+        const lambertian = lambertians.$[hitRecord.materialIndex];
+        bounce = scatterLambertian(lambertian, hitRecord, i, samples);
+      }
+
+      let color = d.vec3f(0, 0, 0);
+      if (bounce.didBounce) {
+        color = d.vec3f(bounce.attenuation);
+      }
+
+      return RayTraceResult({ color, bounce });
     } else {
       const unitDirection = normalize(ray.direction);
       const a = 0.5 * (unitDirection.y + 1.0);
