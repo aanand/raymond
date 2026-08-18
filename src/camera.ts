@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { floor, normalize, pack4x8unorm, sqrt } from "typegpu/std";
+import { normalize, pack4x8unorm, sqrt } from "typegpu/std";
 
 import { hitSphere, Sphere } from "./sphere";
 import { Ray, Interval, HitRecord, didNotHit, interval, INF, noise, Bounce, didNotBounce } from "./utils";
@@ -85,7 +85,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     });
 
     const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const result = rayTrace(ray, floor(randomFloat * 1000), 1000);
+    const result = rayTrace(ray, randomFloat);
 
     state.$.currentSample[pixelIndex] = d.vec3f(result.color);
     state.$.bounces[pixelIndex] = Bounce(result.bounce);
@@ -101,7 +101,7 @@ export const render = async ({ aspectRatio, imageWidth, samplesPerPixel, maxBoun
     // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
 
     const randomFloat = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-    const bounceResult = rayTrace(bounce.ray, floor(randomFloat * 1000), 1000);
+    const bounceResult = rayTrace(bounce.ray, randomFloat);
     const currentValue = state.$.currentSample[pixelIndex];
 
     state.$.currentSample[pixelIndex] = d.vec3f(
@@ -196,14 +196,14 @@ function buildRayTraceFunction(world: World) {
     return hitRecord;
   });
 
-  return tgpu.fn([Ray, d.f32, d.f32], RayTraceResult)((ray, i, samples) => {
+  return tgpu.fn([Ray, d.f32], RayTraceResult)((ray, randomFloat) => {
     const hitRecord = hitWorld(ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
       let bounce = didNotBounce();
       if (hitRecord.materialType === MATERIAL_LAMBERTIAN) {
         const lambertian = lambertians.$[hitRecord.materialIndex];
-        bounce = scatterLambertian(lambertian, hitRecord, i, samples);
+        bounce = scatterLambertian(lambertian, hitRecord, randomFloat);
       } else if (hitRecord.materialType === MATERIAL_METAL) {
         const metal = metals.$[hitRecord.materialIndex];
         bounce = scatterMetal(metal, ray, hitRecord);

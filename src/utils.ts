@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { fract } from "typegpu/std";
+import { floor, fract } from "typegpu/std";
 
 export const INF = d.f32(3.40282347e+38);
 export const PI = d.f32(3.1415927);
@@ -78,4 +78,5 @@ const fibonacciSphere = tgpu.fn([d.f32, d.f32], d.vec3f)`(i: f32, samples: f32) 
   return vec3f(x, y, z);
 }`;
 
-export const randomUnitVector = tgpu.fn([d.f32, d.f32], d.vec3f)((i, numSamples) => fibonacciSphere(i, numSamples));
+export const randomUnitVector = tgpu.fn([d.f32], d.vec3f)((randomFloat) =>
+  fibonacciSphere(floor(randomFloat * 1000), 1000));

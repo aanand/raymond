@@ -10,8 +10,8 @@ export const Lambertian = d.struct({
   albedo: d.vec3f,
 });
 
-export const scatterLambertian = tgpu.fn([Lambertian, HitRecord, d.f32, d.f32], Bounce)((lambertian, hitRecord, i, samples) => {
-  const bounceDirection = normalize(hitRecord.normal.add(randomUnitVector(i, samples)));
+export const scatterLambertian = tgpu.fn([Lambertian, HitRecord, d.f32], Bounce)((lambertian, hitRecord, randomFloat) => {
+  const bounceDirection = normalize(hitRecord.normal.add(randomUnitVector(randomFloat)));
   const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
 
   return Bounce({
