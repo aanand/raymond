@@ -47,8 +47,16 @@ export const makeGpuFunctions = async ({
   const root = await tgpu.init();
   const state = root.createMutable(State, initialState());
 
-  const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex =>
-    state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF);
+  const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex => {
+    let float = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
+
+    // Ensure we never return 1.0. Does this bias it? Probably technically, yeah.
+    if (float === 1.0) {
+      return 0.0;
+    }
+
+    return float;
+  });
 
   const fireInitialRay = tgpu.fn([d.u32], RayTraceResult)((pixelIndex) => {
     'use gpu';
