@@ -62,7 +62,7 @@ export const makeGpuFunctions = async ({
   const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex =>
     state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF);
 
-  const fireInitialRays = root.createGuardedComputePipeline((pixelIndex) => {
+  const fireInitialRay = tgpu.fn([d.u32])((pixelIndex) => {
     'use gpu';
 
     const x = d.u32(pixelIndex % imageWidth);
@@ -88,7 +88,7 @@ export const makeGpuFunctions = async ({
     state.$.bounces[pixelIndex] = Bounce(result.bounce);
   });
 
-  const processBounces = root.createGuardedComputePipeline((pixelIndex) => {
+  const processBounces = tgpu.fn([d.u32])((pixelIndex) => {
     'use gpu';
 
     const bounce = state.$.bounces[pixelIndex];
@@ -108,7 +108,7 @@ export const makeGpuFunctions = async ({
     });
   });
 
-  const accumulateCurrentSample = root.createGuardedComputePipeline((pixelIndex) => {
+  const accumulateCurrentSample = tgpu.fn([d.u32])((pixelIndex) => {
     'use gpu';
     state.$.accumulatedSamples[pixelIndex] = state.$.accumulatedSamples[pixelIndex].add(d.vec4f(
       state.$.currentSample[pixelIndex].r,
@@ -128,7 +128,7 @@ export const makeGpuFunctions = async ({
 
   const pixelBuffer = root.createMutable(d.arrayOf(d.u32, numPixels));
 
-  const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
+  const writePixels = tgpu.fn([d.u32])((pixelIndex) => {
     'use gpu';
     const accumulation = state.$.accumulatedSamples[pixelIndex];
     pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
@@ -139,29 +139,36 @@ export const makeGpuFunctions = async ({
     ));
   });
 
+  function renderOnePass(samplesPerPass: number, maxBounceDepth: number) {
+    state.patch({ randomValues: generateRandomValues() });
+
+    root.createGuardedComputePipeline((pixelIndex) => {
+      'use gpu';
+
+      for (let s = 0; s < samplesPerPass; s++) {
+        state.$.sampleIndex++;
+        fireInitialRay(pixelIndex);
+
+        for (let i = 0; i < maxBounceDepth; i++) {
+          processBounces(pixelIndex);
+        }
+
+        accumulateCurrentSample(pixelIndex);
+      }
+
+      writePixels(pixelIndex);
+    }).dispatchThreads(numPixels);
+  };
+
   return {
+    renderOnePass,
+
     updateCamera(newValue: Camera) {
       camera = newValue;
     },
 
     resetState() {
       state.write(initialState());
-    },
-
-    renderOnePass(samplesPerPass: number, maxBounceDepth: number) {
-      for (let s = 0; s < samplesPerPass; s++) {
-        state.patch({ sampleIndex: s, randomValues: generateRandomValues() });
-        fireInitialRays.dispatchThreads(numPixels);
-
-        for (let i = 0; i < maxBounceDepth; i++) {
-          state.patch({ randomValues: generateRandomValues() });
-          processBounces.dispatchThreads(numPixels);
-        }
-
-        accumulateCurrentSample.dispatchThreads(numPixels);
-      }
-
-      writePixels.dispatchThreads(numPixels);
     },
 
     async getPixelData() {
