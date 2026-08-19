@@ -10,7 +10,7 @@ import './style.css';
 import { clamp, cos, cross, dot, mix, sin } from 'typegpu/std';
 
 const aspectRatio = 16.0/9.0;
-const imageWidth = 800;
+const imageWidth = 1000;
 const vfov = 40;
 const lookAt = d.vec3f(0, 0, -1);
 const vup = d.vec3f(0, 1, 0);
@@ -119,7 +119,7 @@ window.addEventListener('mouseup', () => { isMoving = false });
 canvas.addEventListener('mousemove', event => {
   if (isMoving) {
     azimuth = (azimuth + event.movementX * movementSpeed) % (Math.PI * 2);
-    elevation = clamp(elevation + event.movementY * movementSpeed, 0, Math.PI * 0.4);
+    elevation = clamp(elevation + event.movementY * movementSpeed, Math.PI * -0.03, Math.PI * 0.3);
     updateCamera();
   }
 });
