@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { floor, fract } from "typegpu/std";
+import { abs, floor, fract } from "typegpu/std";
 
 export const INF = d.f32(3.40282347e+38);
 export const PI = d.f32(3.1415927);
@@ -80,3 +80,14 @@ const fibonacciSphere = tgpu.fn([d.f32, d.f32], d.vec3f)`(i: f32, samples: f32) 
 
 export const randomUnitVector = tgpu.fn([d.f32], d.vec3f)((randomFloat) =>
   fibonacciSphere(floor(randomFloat * 1000), 1000));
+
+export const isNearZero = tgpu.fn([d.vec3f], d.bool)(vec => {
+  const s = 1e-8;
+  return abs(vec.x) < s && abs(vec.y) < s && abs(vec.z) < s;
+});
+
+// Useful for debugging
+export const isInvalidFloat = tgpu.fn([d.f32], d.bool)(/* wgsl */`(val) -> {
+  let bits = bitcast<u32>(val);
+  return (bits & 0x7fffffffu) >= 0x7f800000u;
+}`);

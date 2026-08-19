@@ -1,7 +1,7 @@
 import tgpu, { d } from "typegpu";
-import { dot, min, normalize, pow, reflect, refract, sqrt } from "typegpu/std";
+import { dot, min, normalize, pow, reflect, refract, select, sqrt } from "typegpu/std";
 
-import { Bounce, didNotBounce, HitRecord, randomUnitVector, Ray } from "./utils";
+import { Bounce, didNotBounce, HitRecord, isNearZero, randomUnitVector, Ray } from "./utils";
 
 export const MATERIAL_LAMBERTIAN = 0;
 export const MATERIAL_METAL = 1;
@@ -12,7 +12,9 @@ export const Lambertian = d.struct({
 });
 
 export const scatterLambertian = tgpu.fn([Lambertian, HitRecord, d.f32], Bounce)((lambertian, hitRecord, randomFloat) => {
-  const bounceDirection = normalize(hitRecord.normal.add(randomUnitVector(randomFloat)));
+  const perturbation = randomUnitVector(randomFloat);
+  const perturbed = hitRecord.normal.add(perturbation);
+  const bounceDirection = select(perturbed, hitRecord.normal, isNearZero(perturbed));
   const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
 
   return Bounce({
