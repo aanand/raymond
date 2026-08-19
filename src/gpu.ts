@@ -4,15 +4,7 @@ import { pack4x8unorm, sqrt } from "typegpu/std";
 import { Bounce, didNotBounce, noise, Ray } from "./utils";
 import { buildRayTraceFunction } from "./rayTrace";
 import type { World } from "./world";
-
-const CameraStruct = d.struct({
-  center: d.vec3f,
-  pixel00Loc: d.vec3f,
-  pixelDeltaU: d.vec3f,
-  pixelDeltaV: d.vec3f,
-});
-
-export type Camera = d.Infer<typeof CameraStruct>;
+import { CameraStruct, type Camera } from "./camera";
 
 export const makeGpuFunctions = async ({
   initialCamera,
