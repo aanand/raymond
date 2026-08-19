@@ -6,7 +6,7 @@ import { Sphere, hitSphere } from "./sphere";
 import { Bounce, Ray, Interval, HitRecord, didNotHit, interval, INF, didNotBounce } from "./utils";
 import type { World } from "./world";
 
-const RayTraceResult = d.struct({
+export const RayTraceResult = d.struct({
   color: d.vec3f,
   bounce: Bounce,
 });

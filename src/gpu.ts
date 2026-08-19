@@ -1,8 +1,8 @@
 import tgpu, { d } from "typegpu";
 import { pack4x8unorm, sqrt } from "typegpu/std";
 
-import { Bounce, didNotBounce, noise, Ray } from "./utils";
-import { buildRayTraceFunction } from "./rayTrace";
+import { noise, Ray } from "./utils";
+import { buildRayTraceFunction, RayTraceResult } from "./rayTrace";
 import type { World } from "./world";
 import { CameraStruct, type Camera } from "./camera";
 
@@ -29,9 +29,7 @@ export const makeGpuFunctions = async ({
   const State = d.struct({
     camera: CameraStruct,
     sampleIndex: d.u32,
-    currentSample: d.arrayOf(d.vec3f, numPixels),
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
-    bounces: d.arrayOf(Bounce, numPixels),
     randomValues: d.arrayOf(d.u32, numRandomValues),
   });
 
@@ -40,9 +38,7 @@ export const makeGpuFunctions = async ({
   const initialState = () => ({
     camera,
     sampleIndex: 0,
-    currentSample: new Float32Array(numPixels * 4),
     accumulatedSamples: new Float32Array(numPixels * 4),
-    bounces: Array.from({ length: 100 }).map(didNotBounce),
     randomValues: new Uint32Array(numRandomValues),
   });
 
@@ -54,7 +50,7 @@ export const makeGpuFunctions = async ({
   const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex =>
     state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF);
 
-  const fireInitialRay = tgpu.fn([d.u32])((pixelIndex) => {
+  const fireInitialRay = tgpu.fn([d.u32], RayTraceResult)((pixelIndex) => {
     'use gpu';
 
     const x = d.u32(pixelIndex % imageWidth);
@@ -74,38 +70,43 @@ export const makeGpuFunctions = async ({
       direction: pixelCenter.sub(state.$.camera.center)
     });
 
-    const result = rayTrace(ray, randomFloat(pixelIndex));
-
-    state.$.currentSample[pixelIndex] = d.vec3f(result.color);
-    state.$.bounces[pixelIndex] = Bounce(result.bounce);
+    return rayTrace(ray, randomFloat(pixelIndex));
   });
 
-  const processBounces = tgpu.fn([d.u32])((pixelIndex) => {
+  const processBounces = tgpu.fn([d.u32, RayTraceResult, d.u32], RayTraceResult)((pixelIndex, rayTraceResult, numBounces) => {
     'use gpu';
 
-    const bounce = state.$.bounces[pixelIndex];
-    const bounceResult = rayTrace(bounce.ray, randomFloat(pixelIndex));
+    let result = RayTraceResult(rayTraceResult);
 
-    const currentValue = state.$.currentSample[pixelIndex];
-    state.$.currentSample[pixelIndex] = d.vec3f(
-      bounce.didBounce ? currentValue[0] * bounceResult.color[0] : currentValue[0],
-      bounce.didBounce ? currentValue[1] * bounceResult.color[1] : currentValue[1],
-      bounce.didBounce ? currentValue[2] * bounceResult.color[2] : currentValue[2],
-    );
+    for (let i = d.u32(0); i < numBounces; i++) {
+      const currentColor = result.color;
+      const bounce = result.bounce;
+      const bounceResult = rayTrace(bounce.ray, randomFloat(pixelIndex));
 
-    state.$.bounces[pixelIndex] = Bounce({
-      didBounce: bounceResult.bounce.didBounce,
-      ray: bounceResult.bounce.ray,
-      attenuation: bounceResult.bounce.attenuation,
-    });
+      result = RayTraceResult({
+        color: d.vec3f(
+          currentColor.r * (bounce.didBounce ? bounceResult.color.r : 1.0),
+          currentColor.g * (bounce.didBounce ? bounceResult.color.g : 1.0),
+          currentColor.b * (bounce.didBounce ? bounceResult.color.b : 1.0),
+        ),
+
+        bounce: bounceResult.bounce,
+      });
+    }
+
+    return result;
   });
 
-  const accumulateCurrentSample = tgpu.fn([d.u32])((pixelIndex) => {
+  const sample = tgpu.fn([d.u32, d.u32])((pixelIndex, numBounces) => {
     'use gpu';
+
+    const initialResult = fireInitialRay(pixelIndex);
+    const bouncedResult = processBounces(pixelIndex, initialResult, numBounces);
+
     state.$.accumulatedSamples[pixelIndex] = state.$.accumulatedSamples[pixelIndex].add(d.vec4f(
-      state.$.currentSample[pixelIndex].r,
-      state.$.currentSample[pixelIndex].g,
-      state.$.currentSample[pixelIndex].b,
+      bouncedResult.color.r,
+      bouncedResult.color.g,
+      bouncedResult.color.b,
       1
     ));
   });
@@ -131,7 +132,7 @@ export const makeGpuFunctions = async ({
     ));
   });
 
-  function renderOnePass(samplesPerPass: number, maxBounceDepth: number) {
+  function renderOnePass(samplesPerPass: number, numBounces: number) {
     state.patch({ randomValues: generateRandomValues() });
 
     root.createGuardedComputePipeline((pixelIndex) => {
@@ -139,13 +140,7 @@ export const makeGpuFunctions = async ({
 
       for (let s = 0; s < samplesPerPass; s++) {
         state.$.sampleIndex++;
-        fireInitialRay(pixelIndex);
-
-        for (let i = 0; i < maxBounceDepth; i++) {
-          processBounces(pixelIndex);
-        }
-
-        accumulateCurrentSample(pixelIndex);
+        sample(pixelIndex, numBounces);
       }
 
       writePixels(pixelIndex);
