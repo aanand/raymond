@@ -3,12 +3,20 @@ import { dot, length, sqrt, select } from "typegpu/std";
 import { Ray, Interval, didNotHit, surrounds, at } from "./utils";
 import { HitRecord } from "./types";
 import { MaterialReference } from "./types";
+import { aabb, AABB } from "./aabb";
 
 export const Sphere = d.struct({
   center: d.vec3f,
   radius: d.f32,
   material: MaterialReference,
+  bbox: AABB,
 });
+
+export const sphere = (props: Omit<d.Infer<typeof Sphere>, 'bbox'>): d.Infer<typeof Sphere> => {
+  const rVec = d.vec3f(props.radius, props.radius, props.radius);
+  const bbox = aabb(props.center.sub(rVec), props.center.add(rVec));
+  return { ...props, bbox };
+}
 
 export const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ray, rayT) => {
   const oc = sphere.center.sub(ray.origin);

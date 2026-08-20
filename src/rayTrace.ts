@@ -6,6 +6,8 @@ import { Sphere, hitSphere } from "./sphere";
 import { Bounce, Ray, Interval, didNotHit, interval, INF, didNotBounce } from "./utils";
 import { HitRecord } from "./types";
 import type { World } from "./world";
+import { BVHNode, makeBVH } from "./bvh";
+import { hitAABB } from "./aabb";
 
 export const RayTraceResult = d.struct({
   color: d.vec3f,
@@ -14,20 +16,50 @@ export const RayTraceResult = d.struct({
 
 export function buildRayTraceFunction(world: World) {
   const spheres = tgpu.const(d.arrayOf(Sphere, world.spheres.length), world.spheres);
+
+  const { nodes, depth } = makeBVH(world.spheres);
+  const bvh = tgpu.const(d.arrayOf(BVHNode, nodes.length), nodes);
+
   const lambertians = tgpu.const(d.arrayOf(Lambertian, world.lambertians.length), world.lambertians);
   const metals = tgpu.const(d.arrayOf(Metal, world.metals.length), world.metals);
   const dielectrics = tgpu.const(d.arrayOf(Dielectric, world.dielectrics.length), world.dielectrics);
 
   const hitWorld = tgpu.fn([Ray, Interval], HitRecord)((ray, rayT) => {
+    const stack = d.arrayOf(d.u32, depth)();
+    stack[0] = 0;
+    let stackHead = 0;
+
     let hitRecord = didNotHit();
     let closestSoFar = rayT.max;
 
-    for (let i = 0; i < spheres.$.length; i++) {
-      const sphereHit = hitSphere(spheres.$[i], ray, interval(rayT.min, closestSoFar));
-      if (sphereHit.isHit) {
-        hitRecord = HitRecord(sphereHit);
-        closestSoFar = sphereHit.t;
+    while (stackHead >= 0) {
+      const nodeIndex = stack[stackHead];
+      stackHead--;
+
+      const node = bvh.$[nodeIndex];
+      // @ts-expect-error: node.bbox is readonly
+      const hit = hitAABB(node.bbox, ray, interval(rayT.min, closestSoFar));
+
+      if (!hit) {
+        continue;
       }
+
+      if (node.isLeaf) {
+        const object = spheres.$[node.objectIndex];
+        // @ts-expect-error: object is readonly
+        const sphereHit = hitSphere(object, ray, interval(rayT.min, closestSoFar));
+        if (sphereHit.isHit) {
+          hitRecord = HitRecord(sphereHit);
+          closestSoFar = sphereHit.t;
+        }
+        continue;
+      }
+
+      stackHead++;
+      stack[stackHead] = node.leftIndex;
+
+      stackHead++;
+      stack[stackHead] = node.rightIndex;
     }
 
     return hitRecord;

@@ -1,7 +1,7 @@
 import { d } from "typegpu";
 import { length } from "typegpu/std";
 
-import { Sphere } from "./sphere";
+import { sphere, Sphere } from "./sphere";
 import { MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Dielectric, Lambertian, Metal } from "./material";
 import { MaterialReference } from "./types";
 
@@ -33,7 +33,7 @@ const makeDielectric = (props: d.Infer<typeof Dielectric>): d.Infer<typeof Mater
 }
 
 const makeSphere = (center: d.v3f, radius: number, material: d.Infer<typeof MaterialReference>) => {
-  spheres.push(Sphere({ center, radius, material }));
+  spheres.push(sphere({ center, radius, material }));
 }
 
 const randomColor = (min = 0, max = 1): d.v3f =>

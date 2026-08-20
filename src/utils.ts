@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { abs, cos, floor, fract, sin, sqrt } from "typegpu/std";
+import { abs, cos, floor, fract, max, min, sin, sqrt } from "typegpu/std";
 import { MaterialReference } from "./types";
 import { HitRecord } from "./types";
 
@@ -13,6 +13,9 @@ export const Interval = d.struct({
 
 export const interval = tgpu.fn([d.f32, d.f32], Interval)((min, max) => Interval({ min, max }));
 export const surrounds = tgpu.fn([Interval, d.f32], d.bool)((i, num) => i.min < num && num < i.max);
+
+export const combineIntervals = tgpu.fn([Interval, Interval], Interval)((a, b) =>
+  interval(min(a.min, b.min), max(a.max, b.max)));
 
 export const Ray = d.struct({
   origin: d.vec3f,
