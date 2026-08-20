@@ -1,20 +1,17 @@
 import { d } from 'typegpu';
 import { clamp, cos, cross, dot, mix, sin } from 'typegpu/std';
 
-import { Sphere } from './sphere';
 import { createRenderer } from './renderer';
-
-import type { World } from './world';
-import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
 import type { CameraProps } from './camera';
+import { world } from './world';
 
 import './style.css';
 
 const aspectRatio = 16.0/9.0;
 const imageWidth = 1000;
-const samplesPerPixel = 2000;
-const samplesPerPass = 5;
-const maxBounceDepth = 10;
+const samplesPerPixel = 100;
+const samplesPerPass = 1;
+const maxBounceDepth = 5;
 
 const vfov = 40;
 const lookAt = d.vec3f(0, 0, -1);
@@ -51,52 +48,6 @@ const getCameraProps = (): CameraProps => ({
   focusDistance,
 });
 
-const world: World = {
-  spheres: [
-    Sphere({
-      center: d.vec3f(0, -100.5, -1),
-      radius: 100,
-      materialType: MATERIAL_LAMBERTIAN,
-      materialIndex: 0,
-    }),
-    Sphere({
-      center: d.vec3f(0, 0, -1),
-      radius:  0.5,
-      materialType: MATERIAL_METAL,
-      materialIndex: 0,
-    }),
-    Sphere({
-      center: d.vec3f(-1.25, 0, -1),
-      radius: 0.5,
-      materialType: MATERIAL_DIELECTRIC,
-      materialIndex: 0,
-    }),
-    Sphere({
-      center: d.vec3f(-1.25, 0, -1),
-      radius: 0.4,
-      materialType: MATERIAL_DIELECTRIC,
-      materialIndex: 1,
-    }),
-    Sphere({
-      center: d.vec3f(1.25, 0, -1),
-      radius: 0.5,
-      materialType: MATERIAL_LAMBERTIAN,
-      materialIndex: 1,
-    }),
-  ],
-  lambertians: [
-    Lambertian({ albedo: d.vec3f(0.8, 0.8, 0.0) }), // Ground
-    Lambertian({ albedo: d.vec3f(0.1, 0.2, 0.5) }), // Right sphere
-  ],
-  metals: [
-    Metal({ albedo: d.vec3f(0.8, 0.6, 0.4), fuzz: 0.1 }), // Middle sphere
-  ],
-  dielectrics: [
-    Dielectric({ refractionIndex: 1.5 }),     // Left sphere (outside)
-    Dielectric({ refractionIndex: 1.0/1.5 }), // Left sphere (inside)
-  ]
-}
-
 const canvas = initializeCanvas();
 
 const { render, setCameraProps } = await createRenderer({
@@ -128,7 +79,7 @@ window.addEventListener('mouseup', () => { isMoving = false });
 canvas.addEventListener('mousemove', event => {
   if (isMoving) {
     azimuth = (azimuth + event.movementX * movementSpeed) % (Math.PI * 2);
-    elevation = clamp(elevation + event.movementY * movementSpeed, Math.PI * -0.03, Math.PI * 0.3);
+    elevation = clamp(elevation + event.movementY * movementSpeed, 0, Math.PI * 0.3);
     updateCamera();
   }
 });

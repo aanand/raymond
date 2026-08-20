@@ -1,12 +1,13 @@
 import tgpu, { d } from "typegpu";
 import { dot, length, sqrt, select } from "typegpu/std";
-import { Ray, Interval, HitRecord, didNotHit, surrounds, at } from "./utils";
+import { Ray, Interval, didNotHit, surrounds, at } from "./utils";
+import { HitRecord } from "./types";
+import { MaterialReference } from "./types";
 
 export const Sphere = d.struct({
   center: d.vec3f,
   radius: d.f32,
-  materialType: d.u32,
-  materialIndex: d.u32,
+  material: MaterialReference,
 });
 
 export const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ray, rayT) => {
@@ -44,7 +45,6 @@ export const hitSphere = tgpu.fn([Sphere, Ray, Interval], HitRecord)((sphere, ra
     normal,
     t,
     isFrontFace,
-    materialType: sphere.materialType,
-    materialIndex: sphere.materialIndex,
+    material: sphere.material,
   });
 });

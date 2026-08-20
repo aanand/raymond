@@ -3,7 +3,8 @@ import { normalize } from "typegpu/std";
 
 import { Lambertian, Metal, Dielectric, MATERIAL_LAMBERTIAN, scatterLambertian, MATERIAL_METAL, scatterMetal, MATERIAL_DIELECTRIC, scatterDielectric } from "./material";
 import { Sphere, hitSphere } from "./sphere";
-import { Bounce, Ray, Interval, HitRecord, didNotHit, interval, INF, didNotBounce } from "./utils";
+import { Bounce, Ray, Interval, didNotHit, interval, INF, didNotBounce } from "./utils";
+import { HitRecord } from "./types";
 import type { World } from "./world";
 
 export const RayTraceResult = d.struct({
@@ -37,14 +38,14 @@ export function buildRayTraceFunction(world: World) {
 
     if (hitRecord.isHit) {
       let bounce = didNotBounce();
-      if (hitRecord.materialType === MATERIAL_LAMBERTIAN) {
-        const lambertian = lambertians.$[hitRecord.materialIndex];
+      if (hitRecord.material.kind === MATERIAL_LAMBERTIAN) {
+        const lambertian = lambertians.$[hitRecord.material.index];
         bounce = scatterLambertian(lambertian, hitRecord, randomFloat);
-      } else if (hitRecord.materialType === MATERIAL_METAL) {
-        const metal = metals.$[hitRecord.materialIndex];
+      } else if (hitRecord.material.kind === MATERIAL_METAL) {
+        const metal = metals.$[hitRecord.material.index];
         bounce = scatterMetal(metal, ray, hitRecord, randomFloat);
-      } else if (hitRecord.materialType === MATERIAL_DIELECTRIC) {
-        const dielectric = dielectrics.$[hitRecord.materialIndex];
+      } else if (hitRecord.material.kind === MATERIAL_DIELECTRIC) {
+        const dielectric = dielectrics.$[hitRecord.material.index];
         bounce = scatterDielectric(dielectric, ray, hitRecord, randomFloat);
       }
 

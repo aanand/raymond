@@ -1,7 +1,8 @@
 import tgpu, { d } from "typegpu";
 import { dot, min, normalize, pow, reflect, refract, select, sqrt } from "typegpu/std";
 
-import { Bounce, didNotBounce, HitRecord, isNearZero, randomUnitVector, Ray } from "./utils";
+import { Bounce, didNotBounce, isNearZero, randomUnitVector, Ray } from "./utils";
+import { HitRecord } from "./types";
 
 export const MATERIAL_LAMBERTIAN = 0;
 export const MATERIAL_METAL = 1;

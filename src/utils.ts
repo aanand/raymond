@@ -1,5 +1,7 @@
 import tgpu, { d } from "typegpu";
 import { abs, cos, floor, fract, sin, sqrt } from "typegpu/std";
+import { MaterialReference } from "./types";
+import { HitRecord } from "./types";
 
 export const INF = d.f32(3.40282347e+38);
 export const PI = d.f32(3.1415927);
@@ -22,16 +24,6 @@ export const at = (ray: d.Infer<typeof Ray>, t: number) => {
   return ray.origin.add(ray.direction.mul(t));
 }
 
-export const HitRecord = d.struct({
-  isHit: d.bool,
-  position: d.vec3f,
-  normal: d.vec3f,
-  t: d.f32,
-  isFrontFace: d.bool,
-  materialType: d.u32,
-  materialIndex: d.u32,
-});
-
 export const didNotHit = () => {
   'use gpu';
   return HitRecord({
@@ -40,8 +32,7 @@ export const didNotHit = () => {
     normal: d.vec3f(0, 0, 1),
     t: 0,
     isFrontFace: false,
-    materialType: 0,
-    materialIndex: 0,
+    material: MaterialReference({ kind: 0, index: 0 }),
   });
 }
 
