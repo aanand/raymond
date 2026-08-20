@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { abs, cos, floor, fract, max, min, sin, sqrt } from "typegpu/std";
+import { abs, max, min } from "typegpu/std";
 import { MaterialReference } from "./types";
 import { HitRecord } from "./types";
 
@@ -55,31 +55,6 @@ export const didNotBounce = () => {
     attenuation: d.vec3f(1, 1, 1),
   });
 }
-
-// Jorge Jimenez' "interleaved gradient noise", from https://medium.com/@jcowles/gpu-ray-tracing-in-one-weekend-3e7d874b3b0f
-export const noise = tgpu.fn([d.f32, d.f32], d.f32)((i, j) =>
-   fract(52.9829189 * fract(i * 0.06711056 + j * 0.00583715)));
-
-// Adapted from https://stackoverflow.com/a/26127012
-// i should be in the range [0, 1]
-const fibonacciSphere = tgpu.fn([d.f32, d.f32], d.vec3f)`(i: f32, samples: f32) -> vec3f {
-  let phi = 3.1415927 * (sqrt(5.0) - 1.0);
-  let y = 1.0 - (i / (samples - 1.0)) * 2.0;
-  let radius = sqrt(1.0 - y*y);
-  let theta = phi * i;
-  let x = cos(theta) * radius;
-  let z = sin(theta) * radius;
-  return vec3f(x, y, z);
-}`;
-
-export const randomUnitVector = tgpu.fn([d.f32], d.vec3f)((randomFloat) =>
-  fibonacciSphere(floor(randomFloat * 1000), 1000));
-
-export const randomInUnitDisk = tgpu.fn([d.f32, d.f32], d.vec3f)((randomFloat1, randomFloat2) => {
-  const r = sqrt(randomFloat1);
-  const theta = randomFloat2 * 2 * PI;
-  return d.vec3f(r * cos(theta), r * sin(theta), 0);
-});
 
 export const isNearZero = tgpu.fn([d.vec3f], d.bool)(vec => {
   const s = 1e-8;

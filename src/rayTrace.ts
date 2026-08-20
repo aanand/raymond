@@ -65,20 +65,20 @@ export function buildRayTraceFunction(world: World) {
     return hitRecord;
   });
 
-  return tgpu.fn([Ray, d.f32], RayTraceResult)((ray, randomFloat) => {
+  return tgpu.fn([Ray], RayTraceResult)((ray) => {
     const hitRecord = hitWorld(ray, interval(0.001, INF));
 
     if (hitRecord.isHit) {
       let bounce = didNotBounce();
       if (hitRecord.material.kind === MATERIAL_LAMBERTIAN) {
         const lambertian = lambertians.$[hitRecord.material.index];
-        bounce = scatterLambertian(lambertian, hitRecord, randomFloat);
+        bounce = scatterLambertian(lambertian, hitRecord);
       } else if (hitRecord.material.kind === MATERIAL_METAL) {
         const metal = metals.$[hitRecord.material.index];
-        bounce = scatterMetal(metal, ray, hitRecord, randomFloat);
+        bounce = scatterMetal(metal, ray, hitRecord);
       } else if (hitRecord.material.kind === MATERIAL_DIELECTRIC) {
         const dielectric = dielectrics.$[hitRecord.material.index];
-        bounce = scatterDielectric(dielectric, ray, hitRecord, randomFloat);
+        bounce = scatterDielectric(dielectric, ray, hitRecord);
       }
 
       let color = d.vec3f(0, 0, 0);

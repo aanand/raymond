@@ -44,7 +44,7 @@ export const createRenderer = async ({
       return;
     }
 
-    gpuFunctions.renderOnePass(samplesPerPass, maxBounceDepth);
+    gpuFunctions.renderOnePass(samplesPerPixel, samplesPerPass, maxBounceDepth);
     numSamplesTaken += samplesPerPass;
 
     nextPassTimeout = setTimeout(renderNextPass, 0);

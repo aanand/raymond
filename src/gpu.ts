@@ -1,10 +1,11 @@
 import tgpu, { d } from "typegpu";
 import { pack4x8unorm, sqrt } from "typegpu/std";
 
-import { noise, randomInUnitDisk, Ray } from "./utils";
+import { Ray } from "./utils";
 import { buildRayTraceFunction, RayTraceResult } from "./rayTrace";
 import type { World } from "./world";
 import { CameraStruct, type Camera } from "./camera";
+import { randf } from "@typegpu/noise";
 
 export const makeGpuFunctions = async ({
   initialCamera,
@@ -18,19 +19,11 @@ export const makeGpuFunctions = async ({
   world: World,
 }) => {
   const numPixels = imageWidth * imageHeight;
-  const numRandomValues = Math.floor(65536 / Uint32Array.BYTES_PER_ELEMENT);
-
-  const generateRandomValues = () => {
-    const values = new Uint32Array(numRandomValues);
-    crypto.getRandomValues(values);
-    return values;
-  }
 
   const State = d.struct({
     camera: CameraStruct,
     sampleIndex: d.u32,
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
-    randomValues: d.arrayOf(d.u32, numRandomValues),
   });
 
   let camera = initialCamera;
@@ -39,7 +32,6 @@ export const makeGpuFunctions = async ({
     camera,
     sampleIndex: 0,
     accumulatedSamples: new Float32Array(numPixels * 4),
-    randomValues: new Uint32Array(numRandomValues),
   });
 
   const rayTrace = buildRayTraceFunction(world);
@@ -47,19 +39,9 @@ export const makeGpuFunctions = async ({
   const root = await tgpu.init();
   const state = root.createMutable(State, initialState());
 
-  const randomFloat = tgpu.fn([d.u32], d.f32)(pixelIndex => {
-    let float = state.$.randomValues[pixelIndex % numRandomValues] / 0xFFFFFFFF;
-
-    // Ensure we never return 1.0. Does this bias it? Probably technically, yeah.
-    if (float === 1.0) {
-      return 0.0;
-    }
-
-    return float;
-  });
-
-  const defocusDiskSample = tgpu.fn([d.f32, d.f32], d.vec3f)((noiseX, noiseY) => {
-    const p = randomInUnitDisk(noiseX, noiseY);
+  const defocusDiskSample = tgpu.fn([], d.vec3f)(() => {
+    const p2d = randf.inUnitCircle();
+    const p = d.vec3f(p2d.x, p2d.y, 0);
 
     return state.$.camera.center
       .add(state.$.camera.defocusDiskU.mul(p))
@@ -72,26 +54,23 @@ export const makeGpuFunctions = async ({
     const x = d.u32(pixelIndex % imageWidth);
     const y = d.u32(pixelIndex / imageWidth);
 
-    const noiseX = noise(d.f32(x + state.$.sampleIndex), d.f32(y));
-    const noiseY = noise(d.f32(x), d.f32(y + state.$.sampleIndex));
-
-    const offsetX = noiseX - 0.5;
-    const offsetY = noiseY - 0.5;
+    const offsetX = randf.sample() - 0.5;
+    const offsetY = randf.sample() - 0.5;
 
     const pixelCenter = state.$.camera.pixel00Loc
       .add(state.$.camera.pixelDeltaU.mul(d.f32(x) + offsetX))
       .add(state.$.camera.pixelDeltaV.mul(d.f32(y) + offsetY));
 
-    const origin = defocusDiskSample(noiseX, noiseY);
+    const origin = defocusDiskSample();
     const ray = Ray({
       origin: origin,
       direction: pixelCenter.sub(origin),
     });
 
-    return rayTrace(ray, randomFloat(pixelIndex));
+    return rayTrace(ray);
   });
 
-  const processBounces = tgpu.fn([d.u32, RayTraceResult, d.u32], RayTraceResult)((pixelIndex, rayTraceResult, numBounces) => {
+  const processBounces = tgpu.fn([RayTraceResult, d.u32], RayTraceResult)((rayTraceResult, numBounces) => {
     'use gpu';
 
     let result = RayTraceResult(rayTraceResult);
@@ -99,7 +78,7 @@ export const makeGpuFunctions = async ({
     for (let i = d.u32(0); i < numBounces; i++) {
       const currentColor = result.color;
       const bounce = result.bounce;
-      const bounceResult = rayTrace(bounce.ray, randomFloat(pixelIndex));
+      const bounceResult = rayTrace(bounce.ray);
 
       result = RayTraceResult({
         color: d.vec3f(
@@ -119,7 +98,7 @@ export const makeGpuFunctions = async ({
     'use gpu';
 
     const initialResult = fireInitialRay(pixelIndex);
-    const bouncedResult = processBounces(pixelIndex, initialResult, numBounces);
+    const bouncedResult = processBounces(initialResult, numBounces);
 
     state.$.accumulatedSamples[pixelIndex] = state.$.accumulatedSamples[pixelIndex].add(d.vec4f(
       bouncedResult.color.r,
@@ -150,11 +129,14 @@ export const makeGpuFunctions = async ({
     ));
   });
 
-  function renderOnePass(samplesPerPass: number, numBounces: number) {
-    state.patch({ randomValues: generateRandomValues() });
-
+  function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
     root.createGuardedComputePipeline((pixelIndex) => {
       'use gpu';
+
+      randf.seed2(
+        d.vec2f(
+          (d.f32(pixelIndex) / d.f32(numPixels)) * 2000 - 1000,
+          (d.f32(state.$.sampleIndex) / d.f32(samplesPerPixel)) * 2000 - 1000));
 
       for (let s = 0; s < samplesPerPass; s++) {
         sample(pixelIndex, numBounces);

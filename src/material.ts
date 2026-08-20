@@ -1,7 +1,8 @@
 import tgpu, { d } from "typegpu";
 import { dot, min, normalize, pow, reflect, refract, select, sqrt } from "typegpu/std";
+import { randf } from '@typegpu/noise';
 
-import { Bounce, didNotBounce, isNearZero, randomUnitVector, Ray } from "./utils";
+import { Bounce, didNotBounce, isNearZero, Ray } from "./utils";
 import { HitRecord } from "./types";
 
 export const MATERIAL_LAMBERTIAN = 0;
@@ -12,8 +13,8 @@ export const Lambertian = d.struct({
   albedo: d.vec3f,
 });
 
-export const scatterLambertian = tgpu.fn([Lambertian, HitRecord, d.f32], Bounce)((lambertian, hitRecord, randomFloat) => {
-  const perturbation = randomUnitVector(randomFloat);
+export const scatterLambertian = tgpu.fn([Lambertian, HitRecord], Bounce)((lambertian, hitRecord) => {
+  const perturbation = randf.onUnitSphere();
   const perturbed = hitRecord.normal.add(perturbation);
   const bounceDirection = select(perturbed, hitRecord.normal, isNearZero(perturbed));
   const bouncedRay = Ray({ origin: hitRecord.position, direction: bounceDirection });
@@ -30,8 +31,8 @@ export const Metal = d.struct({
   fuzz: d.f32,
 });
 
-export const scatterMetal = tgpu.fn([Metal, Ray, HitRecord, d.f32], Bounce)((metal, ray, hitRecord, randomFloat) => {
-  const reflected = reflect(ray.direction, hitRecord.normal).add(randomUnitVector(randomFloat).mul(metal.fuzz));
+export const scatterMetal = tgpu.fn([Metal, Ray, HitRecord], Bounce)((metal, ray, hitRecord) => {
+  const reflected = reflect(ray.direction, hitRecord.normal).add(randf.onUnitSphere().mul(metal.fuzz));
   const bouncedRay = Ray({ origin: hitRecord.position, direction: normalize(reflected) }); // normalize might not be necessary here?
 
   if (dot(bouncedRay.direction, hitRecord.normal) <= 0) {
@@ -49,7 +50,7 @@ export const Dielectric = d.struct({
   refractionIndex: d.f32,
 });
 
-export const scatterDielectric = tgpu.fn([Dielectric, Ray, HitRecord, d.f32], Bounce)((dielectric, ray, hitRecord, randomFloat) => {
+export const scatterDielectric = tgpu.fn([Dielectric, Ray, HitRecord], Bounce)((dielectric, ray, hitRecord) => {
   const ri = hitRecord.isFrontFace ? (1.0/dielectric.refractionIndex) : dielectric.refractionIndex;
 
   const unitDirection = normalize(ray.direction);
@@ -58,7 +59,7 @@ export const scatterDielectric = tgpu.fn([Dielectric, Ray, HitRecord, d.f32], Bo
 
   const cannotRefract = ri * sinTheta > 1.0;
 
-  const direction = (cannotRefract || reflectance(cosTheta, ri) > randomFloat) ?
+  const direction = (cannotRefract || reflectance(cosTheta, ri) > randf.sample()) ?
     reflect(unitDirection, hitRecord.normal) :
     refract(unitDirection, hitRecord.normal, ri);
 
