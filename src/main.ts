@@ -1,22 +1,28 @@
 import { d } from 'typegpu';
+import { clamp, cos, cross, dot, mix, sin } from 'typegpu/std';
 
 import { Sphere } from './sphere';
 import { createRenderer } from './renderer';
 
 import type { World } from './world';
 import { Dielectric, Lambertian, MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Metal } from './material';
+import type { CameraProps } from './camera';
 
 import './style.css';
-import { clamp, cos, cross, dot, mix, sin } from 'typegpu/std';
 
 const aspectRatio = 16.0/9.0;
 const imageWidth = 1000;
-const vfov = 40;
-const lookAt = d.vec3f(0, 0, -1);
-const vup = d.vec3f(0, 1, 0);
 const samplesPerPixel = 2000;
 const samplesPerPass = 5;
 const maxBounceDepth = 10;
+
+const vfov = 40;
+const lookAt = d.vec3f(0, 0, -1);
+const vup = d.vec3f(0, 1, 0);
+
+const cameraDistance = 3.5;
+const defocusAngle = 2;
+const focusDistance = cameraDistance;
 
 const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: number, elevation: number) => {
   const rotateAxis = (v: d.v3f, axis: d.v3f, angleRadians: number) =>
@@ -28,6 +34,22 @@ const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: numbe
 
   return lookAt.add(cameraDirection);
 }
+
+// (0, 0) means (lookAt - lookFrom) = (0, 0, cameraDistance), i.e. "front" view.
+// Positive azimuth moves the camera LEFT
+// Positive elevation moves the camera UP
+let azimuth = Math.PI/4;
+let elevation = Math.PI/8;
+let lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
+
+const getCameraProps = (): CameraProps => ({
+  vfov,
+  lookAt,
+  lookFrom,
+  vup,
+  defocusAngle,
+  focusDistance,
+});
 
 const world: World = {
   spheres: [
@@ -77,24 +99,11 @@ const world: World = {
 
 const canvas = initializeCanvas();
 
-// (0, 0) means (lookAt - lookFrom) = (0, 0, cameraDistance)
-// Positive azimuth moves the camera LEFT
-// Positive elevation moves the camera UP
-const cameraDistance = 3.5;
-let azimuth = Math.PI/4;
-let elevation = Math.PI/8;
-let lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
-
 const { render, setCameraProps } = await createRenderer({
   aspectRatio,
   imageWidth,
 
-  cameraProps: {
-    vfov,
-    lookFrom,
-    lookAt,
-    vup,
-  },
+  cameraProps: getCameraProps(),
 
   samplesPerPixel,
   samplesPerPass,
@@ -105,7 +114,7 @@ const { render, setCameraProps } = await createRenderer({
 
 const updateCamera = () => {
   lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
-  setCameraProps({ vfov, lookFrom, lookAt, vup });
+  setCameraProps(getCameraProps());
 };
 
 updateCamera();

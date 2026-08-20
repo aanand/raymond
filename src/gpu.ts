@@ -1,7 +1,7 @@
 import tgpu, { d } from "typegpu";
 import { pack4x8unorm, sqrt } from "typegpu/std";
 
-import { noise, Ray } from "./utils";
+import { noise, randomInUnitDisk, Ray } from "./utils";
 import { buildRayTraceFunction, RayTraceResult } from "./rayTrace";
 import type { World } from "./world";
 import { CameraStruct, type Camera } from "./camera";
@@ -58,24 +58,34 @@ export const makeGpuFunctions = async ({
     return float;
   });
 
+  const defocusDiskSample = tgpu.fn([d.f32, d.f32], d.vec3f)((noiseX, noiseY) => {
+    const p = randomInUnitDisk(noiseX, noiseY);
+
+    return state.$.camera.center
+      .add(state.$.camera.defocusDiskU.mul(p))
+      .add(state.$.camera.defocusDiskV.mul(p));
+  });
+
   const fireInitialRay = tgpu.fn([d.u32], RayTraceResult)((pixelIndex) => {
     'use gpu';
 
     const x = d.u32(pixelIndex % imageWidth);
     const y = d.u32(pixelIndex / imageWidth);
 
-    // const debug = x === 0 && y === 0; // x === d.u32(imageWidth/2) && y === d.u32(imageHeight/2);
+    const noiseX = noise(d.f32(x + state.$.sampleIndex), d.f32(y));
+    const noiseY = noise(d.f32(x), d.f32(y + state.$.sampleIndex));
 
-    const offsetX = noise(d.f32(x + state.$.sampleIndex), d.f32(y)) - 0.5;
-    const offsetY = noise(d.f32(x), d.f32(y + state.$.sampleIndex)) - 0.5;
+    const offsetX = noiseX - 0.5;
+    const offsetY = noiseY - 0.5;
 
     const pixelCenter = state.$.camera.pixel00Loc
       .add(state.$.camera.pixelDeltaU.mul(d.f32(x) + offsetX))
       .add(state.$.camera.pixelDeltaV.mul(d.f32(y) + offsetY));
 
+    const origin = defocusDiskSample(noiseX, noiseY);
     const ray = Ray({
-      origin: state.$.camera.center,
-      direction: pixelCenter.sub(state.$.camera.center)
+      origin: origin,
+      direction: pixelCenter.sub(origin),
     });
 
     return rayTrace(ray, randomFloat(pixelIndex));
@@ -147,8 +157,8 @@ export const makeGpuFunctions = async ({
       'use gpu';
 
       for (let s = 0; s < samplesPerPass; s++) {
-        state.$.sampleIndex++;
         sample(pixelIndex, numBounces);
+        state.$.sampleIndex++;
       }
 
       writePixels(pixelIndex);

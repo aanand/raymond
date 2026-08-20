@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { abs, floor, fract } from "typegpu/std";
+import { abs, cos, floor, fract, sin, sqrt } from "typegpu/std";
 
 export const INF = d.f32(3.40282347e+38);
 export const PI = d.f32(3.1415927);
@@ -80,6 +80,12 @@ const fibonacciSphere = tgpu.fn([d.f32, d.f32], d.vec3f)`(i: f32, samples: f32) 
 
 export const randomUnitVector = tgpu.fn([d.f32], d.vec3f)((randomFloat) =>
   fibonacciSphere(floor(randomFloat * 1000), 1000));
+
+export const randomInUnitDisk = tgpu.fn([d.f32, d.f32], d.vec3f)((randomFloat1, randomFloat2) => {
+  const r = sqrt(randomFloat1);
+  const theta = randomFloat2 * 2 * PI;
+  return d.vec3f(r * cos(theta), r * sin(theta), 0);
+});
 
 export const isNearZero = tgpu.fn([d.vec3f], d.bool)(vec => {
   const s = 1e-8;
