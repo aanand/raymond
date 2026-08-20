@@ -14,10 +14,10 @@ const samplesPerPass = 1;
 const maxBounceDepth = 5;
 
 const vfov = 40;
-const lookAt = d.vec3f(0, 0, -1);
+const lookAt = d.vec3f(0, 1, 0);
 const vup = d.vec3f(0, 1, 0);
 
-const cameraDistance = 3.5;
+const cameraDistance = 7;
 const defocusAngle = 2;
 const focusDistance = cameraDistance;
 

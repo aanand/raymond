@@ -48,12 +48,14 @@ makeSphere(d.vec3f(0, -1000, 0), 1000, groundMaterial);
 
 const glass = makeDielectric({ refractionIndex: 0.5 });
 
+const spread = 1.8;
+
 for (let a = -11; a < 11; a++) {
   for (let b = -11; b < 11; b++) {
     const chooseMat = Math.random();
-    const center = d.vec3f(a + 0.9*Math.random(), 0.2, b + 0.9*Math.random());
+    const center = d.vec3f(a + spread*Math.random(), 0.2, b + spread*Math.random());
 
-    if (length(center.sub(d.vec3f(4, 0.2, 0))) > 0.9) {
+    if (length(center.sub(d.vec3f(4, 0.2, 0))) > spread) {
       let sphereMaterial: d.Infer<typeof MaterialReference>;
 
       if (chooseMat < 0.8) {
@@ -71,6 +73,10 @@ for (let a = -11; a < 11; a++) {
     }
   }
 }
+
+makeSphere(d.vec3f( 0, 1, 0), 1, makeDielectric({ refractionIndex: 1.5 }));
+makeSphere(d.vec3f(-4, 1, 0), 1, makeLambertian({ albedo: d.vec3f(0.4, 0.2, 0.1) }));
+makeSphere(d.vec3f( 4, 1, 0), 1, makeMetal({ albedo: d.vec3f(0.7, 0.6, 0.5), fuzz: 0 }));
 
 export const world: World = {
   spheres,
