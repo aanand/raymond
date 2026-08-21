@@ -9,7 +9,7 @@ import './style.css';
 
 const aspectRatio = 16.0/9.0;
 const imageWidth = 1000;
-const samplesPerPixel = 100;
+const samplesPerPixel = 2000;
 const samplesPerPass = 1;
 const maxBounceDepth = 5;
 
