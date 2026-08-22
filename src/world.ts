@@ -76,13 +76,13 @@ for (let a = -11; a < 11; a++) {
 }
 
 const bigSphereRadius = 0.75;
-const front = d.vec3f(0, 0, bigSphereRadius*1.16);
-const left = rotateAxis(front, d.vec3f(0, 1, 0), radians(360/3));
-const right = rotateAxis(front, d.vec3f(0, 1, 0), radians(-360/3));
+const back = d.vec3f(0, 0, -bigSphereRadius*1.16);
+const left = rotateAxis(back, d.vec3f(0, 1, 0), radians(-360/3));
+const right = rotateAxis(back, d.vec3f(0, 1, 0), radians(360/3));
 const center = d.vec3f(0, bigSphereRadius, 0);
 
-makeSphere(center.add(front), bigSphereRadius, makeDielectric({ refractionIndex: 1.5 }));
-makeSphere(center.add(left), bigSphereRadius, makeLambertian({ albedo: d.vec3f(0.25, 0.45, 0.55) }));
+makeSphere(center.add(left), bigSphereRadius, makeDielectric({ refractionIndex: 1.5 }));
+makeSphere(center.add(back), bigSphereRadius, makeLambertian({ albedo: d.vec3f(0.25, 0.45, 0.55) }));
 makeSphere(center.add(right), bigSphereRadius, makeMetal({ albedo: d.vec3f(0.7, 0.6, 0.5), fuzz: 0 }));
 
 export const world: World = {
