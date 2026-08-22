@@ -9,7 +9,7 @@ import { rotateAxis } from './utils';
 import './style.css';
 
 const aspectRatio = 1;
-const imageWidth = 1000;
+const imageWidth = 100;
 const samplesPerPixel = 2000;
 const samplesPerPass = 1;
 const maxBounceDepth = 5;
