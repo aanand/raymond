@@ -48,4 +48,5 @@ canvas {
   width: var(--smaller-dimension);
   height: var(--smaller-dimension);
   display: block;
+  touch-action: none;
 }
