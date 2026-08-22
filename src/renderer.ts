@@ -2,7 +2,7 @@ import { d } from "typegpu";
 
 import type { World } from "./world";
 import { makeGpuFunctions } from "./gpu";
-import { setupCamera, type CameraProps } from "./camera";
+import { type CameraProps } from "./camera";
 
 export const createRenderer = async ({
   aspectRatio,
@@ -30,7 +30,7 @@ export const createRenderer = async ({
   const imageHeight = d.u32(Math.max(1, Math.floor(imageWidth/aspectRatio)));
 
   const gpuFunctions = await makeGpuFunctions({
-    initialCamera: setupCamera(imageWidth, imageHeight, cameraProps),
+    initialCameraProps: cameraProps,
     imageWidth,
     imageHeight,
     world,
@@ -71,7 +71,7 @@ export const createRenderer = async ({
   }
 
   const setCameraProps = (newProps: CameraProps) => {
-    gpuFunctions.updateCamera(setupCamera(imageWidth, imageHeight, newProps));
+    gpuFunctions.updateCameraProps(newProps);
     renderAllPasses();
   }
 

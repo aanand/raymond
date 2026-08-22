@@ -13,3 +13,9 @@ export const HitRecord = d.struct({
   isFrontFace: d.bool,
   material: MaterialReference,
 });
+
+export const ImageSize = d.struct({
+  width: d.u32,
+  height: d.u32,
+  numPixels: d.u32,
+});

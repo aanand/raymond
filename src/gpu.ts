@@ -1,35 +1,41 @@
 import tgpu, { d } from "typegpu";
 import { pack4x8unorm, sqrt } from "typegpu/std";
+import { randf } from "@typegpu/noise";
 
 import { Ray } from "./utils";
 import { buildRayTraceFunction, RayTraceResult } from "./rayTrace";
 import type { World } from "./world";
-import { CameraStruct, type Camera } from "./camera";
-import { randf } from "@typegpu/noise";
+import { CameraStruct, setupCamera, type CameraProps } from "./camera";
+import { ImageSize } from "./types";
 
 export const makeGpuFunctions = async ({
-  initialCamera,
+  initialCameraProps,
   imageWidth,
   imageHeight,
   world,
 }: {
-  initialCamera: Camera,
+  initialCameraProps: CameraProps,
   imageWidth: number,
   imageHeight: number,
   world: World,
 }) => {
   const numPixels = imageWidth * imageHeight;
 
+  const sizeList = getSizes(imageWidth, imageHeight, 64);
+  let sizeIndex = 0;
+
   const State = d.struct({
+    size: ImageSize,
     camera: CameraStruct,
     sampleIndex: d.u32,
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
   });
 
-  let camera = initialCamera;
+  let cameraProps = initialCameraProps;
 
   const initialState = () => ({
-    camera,
+    size: sizeList[sizeIndex],
+    camera: setupCamera(sizeList[sizeIndex], cameraProps),
     sampleIndex: 0,
     accumulatedSamples: new Float32Array(numPixels * 4),
   });
@@ -55,18 +61,21 @@ export const makeGpuFunctions = async ({
       .add(state.$.camera.defocusDiskV.mul(p));
   });
 
-  const fireInitialRay = tgpu.fn([d.u32], RayTraceResult)((pixelIndex) => {
-    'use gpu';
+  const getPixelCoords = tgpu.fn([d.u32], d.vec2u)((pixelIndex) =>
+    d.vec2u(
+      d.u32(pixelIndex % state.$.size.width),
+      d.u32(pixelIndex / state.$.size.width),
+    ));
 
-    const x = d.u32(pixelIndex % imageWidth);
-    const y = d.u32(pixelIndex / imageWidth);
+  const fireInitialRay = tgpu.fn([d.vec2u], RayTraceResult)((xy) => {
+    'use gpu';
 
     const offsetX = randf.sample() - 0.5;
     const offsetY = randf.sample() - 0.5;
 
     const pixelCenter = state.$.camera.pixel00Loc
-      .add(state.$.camera.pixelDeltaU.mul(d.f32(x) + offsetX))
-      .add(state.$.camera.pixelDeltaV.mul(d.f32(y) + offsetY));
+      .add(state.$.camera.pixelDeltaU.mul(d.f32(xy.x) + offsetX))
+      .add(state.$.camera.pixelDeltaV.mul(d.f32(xy.y) + offsetY));
 
     const origin = defocusDiskSample();
     const ray = Ray({
@@ -104,15 +113,45 @@ export const makeGpuFunctions = async ({
   const sample = tgpu.fn([d.u32, d.u32])((pixelIndex, numBounces) => {
     'use gpu';
 
-    const initialResult = fireInitialRay(pixelIndex);
+    const xy = getPixelCoords(pixelIndex);
+
+    const initialResult = fireInitialRay(xy);
     const bouncedResult = processBounces(initialResult, numBounces);
 
-    state.$.accumulatedSamples[pixelIndex] = state.$.accumulatedSamples[pixelIndex].add(d.vec4f(
-      bouncedResult.color.r,
-      bouncedResult.color.g,
-      bouncedResult.color.b,
-      1
-    ));
+    const pixelWidth = d.f32(imageWidth) / d.f32(state.$.size.width);
+    const pixelHeight = d.f32(imageHeight) / d.f32(state.$.size.height);
+
+    const fromImagePixel = d.vec2u(d.u32(d.f32(xy.x) * pixelWidth), d.u32(d.f32(xy.y) * pixelHeight));
+    const toImagePixel = d.vec2u(d.u32(d.f32(xy.x + 1) * pixelWidth), d.u32(d.f32(xy.y + 1) * pixelHeight));
+
+    // const debug = xy.x === d.u32(state.$.size.width/2) && xy.y === d.u32(state.$.size.height/2);
+    // const debug = pixelIndex < 2;
+    const debug = false;
+    if (debug) {
+      console.log('[pixelIndex=%s] xy=%s',
+        pixelIndex, xy);
+      console.log('[pixelIndex=%s] fromImagePixel=%s, toImagePixel=%s',
+        pixelIndex, fromImagePixel, toImagePixel);
+    }
+
+    for (let imageY = fromImagePixel.y; imageY < toImagePixel.y; imageY++) {
+      for (let imageX = fromImagePixel.x; imageX < toImagePixel.x; imageX++) {
+        const imagePixelIndex = imageY * imageWidth + imageX;        
+
+        if (debug) {
+          console.log(
+            '[pixelIndex=%s] imageX=%s, imageY=%s, imagePixelIndex=%s',
+            pixelIndex, imageX, imageY, imagePixelIndex);
+        }
+
+        state.$.accumulatedSamples[imagePixelIndex] = state.$.accumulatedSamples[imagePixelIndex].add(d.vec4f(
+          bouncedResult.color.r,
+          bouncedResult.color.g,
+          bouncedResult.color.b,
+          1
+        ));
+      }
+    }
   });
 
   const linearToGamma = tgpu.fn([d.f32], d.f32)(linear => {
@@ -125,7 +164,7 @@ export const makeGpuFunctions = async ({
 
   const pixelBuffer = root.createMutable(d.arrayOf(d.u32, numPixels));
 
-  const writePixels = tgpu.fn([d.u32])((pixelIndex) => {
+  const writePixels = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
     const accumulation = state.$.accumulatedSamples[pixelIndex];
     pixelBuffer.$[pixelIndex] = pack4x8unorm(d.vec4f(
@@ -146,7 +185,7 @@ export const makeGpuFunctions = async ({
   const drawTimes: number[] = [];
   const maxTimingSamples = 30;
 
-  const pipeline = root.createGuardedComputePipeline((pixelIndex) => {
+  const accumulate = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
 
     randf.seed2(
@@ -158,8 +197,6 @@ export const makeGpuFunctions = async ({
       sample(pixelIndex, passConfig.$.numBounces);
       state.$.sampleIndex++;
     }
-
-    writePixels(pixelIndex);
   })
   .withPerformanceCallback((start, end) => {
     renderTimes.unshift((end - start) / BigInt(1000000));
@@ -167,15 +204,26 @@ export const makeGpuFunctions = async ({
   });
 
   function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
+    const size = sizeList[sizeIndex];
+
+    state.patch({
+      size: size,
+      camera: setupCamera(size, cameraProps),
+    });
+
     passConfig.write({ samplesPerPixel, samplesPerPass, numBounces })
-    pipeline.dispatchThreads(numPixels);
+    accumulate.dispatchThreads(size.numPixels);
+    writePixels.dispatchThreads(numPixels);
+
+    sizeIndex = Math.min(sizeIndex + 1, sizeList.length - 1);
   };
 
   return {
     renderOnePass,
 
-    updateCamera(newValue: Camera) {
-      camera = newValue;
+    updateCameraProps(newValue: CameraProps) {
+      cameraProps = newValue;
+      sizeIndex = 0;
     },
 
     resetState() {
@@ -202,4 +250,26 @@ export const makeGpuFunctions = async ({
       };
     }
   };
+};
+
+const getSizes = (imageWidth: number, imageHeight: number, minSize = 1): d.Infer<typeof ImageSize>[] => {
+  const sizes = [
+    ImageSize({
+      width: imageWidth,
+      height: imageHeight,
+      numPixels: imageWidth * imageHeight
+    }),
+  ];
+
+  let w = imageWidth/2, h = imageHeight/2;
+
+  while (w > minSize && h > minSize) {
+    const width = Math.floor(w);
+    const height = Math.floor(h);
+    sizes.unshift(ImageSize({ width, height, numPixels: width * height }));
+    w = w/2;
+    h = h/2;
+  }
+
+  return sizes;
 };

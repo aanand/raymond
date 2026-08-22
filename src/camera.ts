@@ -1,16 +1,19 @@
-import { d } from "typegpu";
+import tgpu, { d } from "typegpu";
 import { radians, tan, normalize, cross } from "typegpu/std";
+import { ImageSize } from "./types";
 
 // What the application provides
-export type CameraProps = {
-  vfov: number,
-  lookFrom: d.v3f,
-  lookAt: d.v3f,
-  vup: d.v3f,
+export const CameraInput = d.struct({
+  vfov: d.f32,
+  lookFrom: d.vec3f,
+  lookAt: d.vec3f,
+  vup: d.vec3f,
 
-  defocusAngle: number,
-  focusDistance: number,
-}
+  defocusAngle: d.f32,
+  focusDistance: d.f32,
+});
+
+export type CameraProps = d.Infer<typeof CameraInput>;
 
 // What the GPU code uses
 export const CameraStruct = d.struct({
@@ -27,16 +30,15 @@ export const CameraStruct = d.struct({
 
 export type Camera = d.Infer<typeof CameraStruct>;
 
-export const setupCamera = (
-  imageWidth: number,
-  imageHeight: number,
-  cameraProps: CameraProps
+export const setupCamera = tgpu.fn([ImageSize, CameraInput], CameraStruct)((
+  size,
+  cameraProps,
 ): Camera => {
   const center = cameraProps.lookFrom;
   const theta = radians(cameraProps.vfov);
   const h = tan(theta/2.0);
   const viewportHeight = 2.0 * h * cameraProps.focusDistance;
-  const viewportWidth = d.f32(viewportHeight * (imageWidth/imageHeight));
+  const viewportWidth = d.f32(viewportHeight * (size.width/size.height));
 
   const w = normalize(cameraProps.lookFrom.sub(cameraProps.lookAt));
   const u = normalize(cross(cameraProps.vup, w));
@@ -45,8 +47,8 @@ export const setupCamera = (
   const viewportU = u.mul(viewportWidth);
   const viewportV = v.mul(-viewportHeight);
 
-  const pixelDeltaU = viewportU.div(imageWidth);
-  const pixelDeltaV = viewportV.div(imageHeight);
+  const pixelDeltaU = viewportU.div(size.width);
+  const pixelDeltaV = viewportV.div(size.height);
 
   const viewportUpperLeft = center
     .sub(w.mul(cameraProps.focusDistance))
@@ -71,4 +73,4 @@ export const setupCamera = (
     defocusDiskU,
     defocusDiskV,
   };
-}
+});
