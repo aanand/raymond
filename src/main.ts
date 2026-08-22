@@ -8,7 +8,7 @@ import { rotateAxis } from './utils';
 
 import './style.css';
 
-const aspectRatio = 16.0/9.0;
+const aspectRatio = 1;
 const imageWidth = 1000;
 const samplesPerPixel = 2000;
 const samplesPerPass = 1;
@@ -34,7 +34,7 @@ const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: numbe
 // Positive azimuth moves the camera LEFT
 // Positive elevation moves the camera UP
 let azimuth = 0;
-let elevation = Math.PI/8;
+let elevation = Math.PI/16;
 let lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
 
 const getCameraProps = (): CameraProps => ({
@@ -66,7 +66,7 @@ const updateCamera = () => {
 
 updateCamera();
 
-const canvas = initializeCanvas();
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const pre = document.querySelector('pre') as HTMLElement;
 const debug = Array.from(new URLSearchParams(window.location.search).keys()).includes('debug');
 
@@ -96,12 +96,3 @@ function frame() {
 }
 
 requestAnimationFrame(frame);
-
-function initializeCanvas() {
-  document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <canvas></canvas>
-  <pre></pre>
-  `;
-
-  return document.querySelector('canvas') as HTMLCanvasElement;
-}
