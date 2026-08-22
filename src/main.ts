@@ -119,6 +119,12 @@ window.addEventListener('touchmove', event => {
   moveTo(event.changedTouches[0].pageX, event.changedTouches[0].pageY);
 });
 
+window.addEventListener('scroll', event => {
+  if (isMoving) {
+    event.preventDefault();
+  }
+});
+
 function frame() {
   renderer.render(canvas);
 
