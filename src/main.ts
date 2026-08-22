@@ -1,9 +1,10 @@
 import { d } from 'typegpu';
-import { clamp, cos, cross, dot, mix, sin } from 'typegpu/std';
+import { clamp } from 'typegpu/std';
 
 import { createRenderer } from './renderer';
 import type { CameraProps } from './camera';
 import { world } from './world';
+import { rotateAxis } from './utils';
 
 import './style.css';
 
@@ -22,9 +23,6 @@ const defocusAngle = 2;
 const focusDistance = cameraDistance;
 
 const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: number, elevation: number) => {
-  const rotateAxis = (v: d.v3f, axis: d.v3f, angleRadians: number) =>
-    mix(axis.mul(dot(axis, v)), v, cos(angleRadians)).add(cross(axis, v).mul(sin(angleRadians)));
-
   let cameraDirection = d.vec3f(0, 0, cameraDistance);
   cameraDirection = rotateAxis(cameraDirection, d.vec3f(1, 0, 0), -elevation);
   cameraDirection = rotateAxis(cameraDirection, d.vec3f(0, 1, 0), -azimuth);
@@ -35,7 +33,7 @@ const calculateLookFrom = (lookAt: d.v3f, cameraDistance: number, azimuth: numbe
 // (0, 0) means (lookAt - lookFrom) = (0, 0, cameraDistance), i.e. "front" view.
 // Positive azimuth moves the camera LEFT
 // Positive elevation moves the camera UP
-let azimuth = Math.PI/4;
+let azimuth = 0;
 let elevation = Math.PI/8;
 let lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
 

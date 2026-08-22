@@ -1,9 +1,10 @@
 import { d } from "typegpu";
-import { length } from "typegpu/std";
+import { length, radians } from "typegpu/std";
 
 import { sphere, Sphere } from "./sphere";
 import { MATERIAL_DIELECTRIC, MATERIAL_LAMBERTIAN, MATERIAL_METAL, Dielectric, Lambertian, Metal } from "./material";
 import { MaterialReference } from "./types";
+import { rotateAxis } from "./utils";
 
 export type World = {
   spheres: d.Infer<typeof Sphere>[],
@@ -74,9 +75,15 @@ for (let a = -11; a < 11; a++) {
   }
 }
 
-makeSphere(d.vec3f( 0, 1, 0), 1, makeDielectric({ refractionIndex: 1.5 }));
-makeSphere(d.vec3f(-4, 1, 0), 1, makeLambertian({ albedo: d.vec3f(0.4, 0.2, 0.1) }));
-makeSphere(d.vec3f( 4, 1, 0), 1, makeMetal({ albedo: d.vec3f(0.7, 0.6, 0.5), fuzz: 0 }));
+const bigSphereRadius = 0.75;
+const front = d.vec3f(0, 0, bigSphereRadius*1.16);
+const left = rotateAxis(front, d.vec3f(0, 1, 0), radians(360/3));
+const right = rotateAxis(front, d.vec3f(0, 1, 0), radians(-360/3));
+const center = d.vec3f(0, bigSphereRadius, 0);
+
+makeSphere(center.add(front), bigSphereRadius, makeDielectric({ refractionIndex: 1.5 }));
+makeSphere(center.add(left), bigSphereRadius, makeLambertian({ albedo: d.vec3f(0.25, 0.45, 0.55) }));
+makeSphere(center.add(right), bigSphereRadius, makeMetal({ albedo: d.vec3f(0.7, 0.6, 0.5), fuzz: 0 }));
 
 export const world: World = {
   spheres,

@@ -1,5 +1,5 @@
 import tgpu, { d } from "typegpu";
-import { abs, max, min } from "typegpu/std";
+import { abs, cos, cross, dot, max, min, mix, sin } from "typegpu/std";
 import { MaterialReference } from "./types";
 import { HitRecord } from "./types";
 
@@ -66,3 +66,8 @@ export const isInvalidFloat = tgpu.fn([d.f32], d.bool)(/* wgsl */`(val) -> {
   let bits = bitcast<u32>(val);
   return (bits & 0x7fffffffu) >= 0x7f800000u;
 }`);
+
+// Rotate a 3D vector around a given axis
+export const rotateAxis = (v: d.v3f, axis: d.v3f, angleRadians: number) =>
+  mix(axis.mul(dot(axis, v)), v, cos(angleRadians))
+    .add(cross(axis, v).mul(sin(angleRadians)));
