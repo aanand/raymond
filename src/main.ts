@@ -78,12 +78,16 @@ let lastX = 0;
 let lastY = 0;
 
 const startMoving = (pageX: number, pageY: number): void => {
+  renderer.setIsLoResMode(true);
+
   isMoving = true;
   lastX = pageX;
   lastY = pageY; 
 }
 
 const stopMoving = () => {
+  renderer.setIsLoResMode(false);
+
   isMoving = false;
   lastX = 0;
   lastY = 0;

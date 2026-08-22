@@ -47,7 +47,9 @@ export const createRenderer = async ({
     gpuFunctions.renderOnePass(samplesPerPixel, samplesPerPass, maxBounceDepth);
     numSamplesTaken += samplesPerPass;
 
-    nextPassTimeout = setTimeout(renderNextPass, 0);
+    if (!gpuFunctions.isLoResMode()) {
+      nextPassTimeout = setTimeout(renderNextPass, 0);
+    }
   }
 
   function renderAllPasses() {
@@ -75,11 +77,19 @@ export const createRenderer = async ({
     renderAllPasses();
   }
 
+  const setIsLoResMode = (enabled: boolean) => {
+    gpuFunctions.setIsLoResMode(enabled);
+    if (!enabled) {
+      renderAllPasses();
+    }
+  };
+
   renderAllPasses();
 
   return {
     render,
     setCameraProps,
+    setIsLoResMode: setIsLoResMode,
     getRenderTime: gpuFunctions.getRenderTime,
   };
 }

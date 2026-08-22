@@ -20,9 +20,11 @@ export const makeGpuFunctions = async ({
   world: World,
 }) => {
   const numPixels = imageWidth * imageHeight;
-
   const sizeList = getSizes(imageWidth, imageHeight, 64);
+
   let sizeIndex = 0;
+  let cameraProps = initialCameraProps;
+  let isLoResMode = false;
 
   const State = d.struct({
     size: ImageSize,
@@ -30,8 +32,6 @@ export const makeGpuFunctions = async ({
     sampleIndex: d.u32,
     accumulatedSamples: d.arrayOf(d.vec4f, numPixels),
   });
-
-  let cameraProps = initialCameraProps;
 
   const initialState = () => ({
     size: sizeList[sizeIndex],
@@ -204,6 +204,10 @@ export const makeGpuFunctions = async ({
   });
 
   function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
+    if (isLoResMode) {
+      sizeIndex = 0;
+    }
+
     const size = sizeList[sizeIndex];
 
     state.patch({
@@ -215,7 +219,9 @@ export const makeGpuFunctions = async ({
     accumulate.dispatchThreads(size.numPixels);
     writePixels.dispatchThreads(numPixels);
 
-    sizeIndex = Math.min(sizeIndex + 1, sizeList.length - 1);
+    if (!isLoResMode) {
+      sizeIndex = Math.min(sizeIndex + 1, sizeList.length - 1);
+    }
   };
 
   return {
@@ -224,6 +230,14 @@ export const makeGpuFunctions = async ({
     updateCameraProps(newValue: CameraProps) {
       cameraProps = newValue;
       sizeIndex = 0;
+    },
+
+    isLoResMode() {
+      return isLoResMode;
+    },
+
+    setIsLoResMode(newValue: boolean) {
+      isLoResMode = newValue;
     },
 
     resetState() {
