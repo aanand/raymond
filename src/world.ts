@@ -56,7 +56,7 @@ for (let a = -11; a < 11; a++) {
     const chooseMat = Math.random();
     const center = d.vec3f(a + spread*Math.random(), 0.2, b + spread*Math.random());
 
-    if (length(center.sub(d.vec3f(4, 0.2, 0))) > spread) {
+    if (length(center.sub(d.vec3f(0, 0, 0))) > spread) {
       let sphereMaterial: d.Infer<typeof MaterialReference>;
 
       if (chooseMat < 0.8) {
