@@ -129,22 +129,31 @@ export const makeGpuFunctions = async ({
     ));
   });
 
+  const passConfig = root.createMutable(d.struct({
+    samplesPerPixel: d.u32,
+    samplesPerPass: d.u32,
+    numBounces: d.u32,
+  }));
+
+  const pipeline = root.createGuardedComputePipeline((pixelIndex) => {
+    'use gpu';
+
+    randf.seed2(
+      d.vec2f(
+        (d.f32(pixelIndex) / d.f32(numPixels)) * 2000 - 1000,
+        (d.f32(state.$.sampleIndex) / d.f32(passConfig.$.samplesPerPixel)) * 2000 - 1000));
+
+    for (let s = 0; s < passConfig.$.samplesPerPass; s++) {
+      sample(pixelIndex, passConfig.$.numBounces);
+      state.$.sampleIndex++;
+    }
+
+    writePixels(pixelIndex);
+  });
+
   function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
-    root.createGuardedComputePipeline((pixelIndex) => {
-      'use gpu';
-
-      randf.seed2(
-        d.vec2f(
-          (d.f32(pixelIndex) / d.f32(numPixels)) * 2000 - 1000,
-          (d.f32(state.$.sampleIndex) / d.f32(samplesPerPixel)) * 2000 - 1000));
-
-      for (let s = 0; s < samplesPerPass; s++) {
-        sample(pixelIndex, numBounces);
-        state.$.sampleIndex++;
-      }
-
-      writePixels(pixelIndex);
-    }).dispatchThreads(numPixels);
+    passConfig.write({ samplesPerPixel, samplesPerPass, numBounces })
+    pipeline.dispatchThreads(numPixels);
   };
 
   return {
