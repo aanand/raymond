@@ -48,9 +48,7 @@ const getCameraProps = (): CameraProps => ({
   focusDistance,
 });
 
-const canvas = initializeCanvas();
-
-const { render, setCameraProps } = await createRenderer({
+const renderer = await createRenderer({
   aspectRatio,
   imageWidth,
 
@@ -65,10 +63,14 @@ const { render, setCameraProps } = await createRenderer({
 
 const updateCamera = () => {
   lookFrom = calculateLookFrom(lookAt, cameraDistance, azimuth, elevation);
-  setCameraProps(getCameraProps());
+  renderer.setCameraProps(getCameraProps());
 };
 
 updateCamera();
+
+const canvas = initializeCanvas();
+const pre = document.querySelector('pre') as HTMLElement;
+const debug = Array.from(new URLSearchParams(window.location.search).keys()).includes('debug');
 
 // Radians per pixel
 const movementSpeed = Math.PI / 256;
@@ -85,7 +87,13 @@ window.addEventListener('mousemove', event => {
 });
 
 function frame() {
-  render(canvas);
+  renderer.render(canvas);
+
+  if (debug) {
+    const renderTimes = renderer.getRenderTime();
+    pre.textContent = `render: ${renderTimes.render.toString()}, draw: ${renderTimes.draw.toString()}`;
+  }
+
   requestAnimationFrame(frame);
 }
 
@@ -94,6 +102,7 @@ requestAnimationFrame(frame);
 function initializeCanvas() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <canvas></canvas>
+  <pre></pre>
   `;
 
   return document.querySelector('canvas') as HTMLCanvasElement;

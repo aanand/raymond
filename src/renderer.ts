@@ -77,5 +77,9 @@ export const createRenderer = async ({
 
   renderAllPasses();
 
-  return { render, setCameraProps };
+  return {
+    render,
+    setCameraProps,
+    getRenderTime: gpuFunctions.getRenderTime,
+  };
 }

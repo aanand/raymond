@@ -36,7 +36,14 @@ export const makeGpuFunctions = async ({
 
   const rayTrace = buildRayTraceFunction(world);
 
-  const root = await tgpu.init();
+  const root = await tgpu.init({
+    device: {
+      optionalFeatures: [
+        'timestamp-query',
+      ],
+    },
+  });
+
   const state = root.createMutable(State, initialState());
 
   const defocusDiskSample = tgpu.fn([], d.vec3f)(() => {
@@ -135,6 +142,10 @@ export const makeGpuFunctions = async ({
     numBounces: d.u32,
   }));
 
+  const renderTimes: bigint[] = [];
+  const drawTimes: number[] = [];
+  const maxTimingSamples = 30;
+
   const pipeline = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
 
@@ -143,12 +154,16 @@ export const makeGpuFunctions = async ({
         (d.f32(pixelIndex) / d.f32(numPixels)) * 2000 - 1000,
         (d.f32(state.$.sampleIndex) / d.f32(passConfig.$.samplesPerPixel)) * 2000 - 1000));
 
-    for (let s = 0; s < passConfig.$.samplesPerPass; s++) {
+    for (let s = 0; s < d.i32(passConfig.$.samplesPerPass); s++) {
       sample(pixelIndex, passConfig.$.numBounces);
       state.$.sampleIndex++;
     }
 
     writePixels(pixelIndex);
+  })
+  .withPerformanceCallback((start, end) => {
+    renderTimes.unshift((end - start) / BigInt(1000000));
+    renderTimes.splice(maxTimingSamples);
   });
 
   function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
@@ -168,8 +183,23 @@ export const makeGpuFunctions = async ({
     },
 
     async getPixelData() {
+      const startTime = new Date().getTime();
+
       const value = await pixelBuffer.read();
-      return new ImageData(new Uint8ClampedArray(new Uint32Array(value).buffer), imageWidth, imageHeight);
+      const imageData = new ImageData(new Uint8ClampedArray(new Uint32Array(value).buffer), imageWidth, imageHeight);
+
+      const drawTime = new Date().getTime() - startTime;
+      drawTimes.unshift(drawTime);
+      drawTimes.splice(maxTimingSamples);
+
+      return imageData;
+    },
+
+    getRenderTime() {
+      return {
+        render: renderTimes.reduce((a, b) => a + b, BigInt(0)),
+        draw: drawTimes.reduce((a, b) => a + b, 0),
+      };
     }
   };
 };
