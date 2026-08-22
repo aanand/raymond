@@ -76,7 +76,7 @@ const movementSpeed = Math.PI / 256;
 let isMoving = false;
 canvas.addEventListener('mousedown', () => { isMoving = true });
 window.addEventListener('mouseup', () => { isMoving = false });
-canvas.addEventListener('mousemove', event => {
+window.addEventListener('mousemove', event => {
   if (isMoving) {
     azimuth = (azimuth + event.movementX * movementSpeed) % (Math.PI * 2);
     elevation = clamp(elevation + event.movementY * movementSpeed, 0, Math.PI * 0.3);
