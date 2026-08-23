@@ -227,24 +227,23 @@ export const makeGpuFunctions = async ({
     }
   };
 
+  const resetState = () => {
+    state.write(initialState());
+  };
+
   return {
     renderOnePass,
 
     updateCameraProps(newValue: CameraProps) {
       cameraProps = newValue;
       sizeIndex = 0;
-    },
-
-    isLoResMode() {
-      return isLoResMode;
+      resetState();
     },
 
     setIsLoResMode(newValue: boolean) {
+      if (newValue === isLoResMode) { return; }
       isLoResMode = newValue;
-    },
-
-    resetState() {
-      state.write(initialState());
+      resetState();
     },
 
     async getPixelData() {

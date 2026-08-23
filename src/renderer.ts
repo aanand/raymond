@@ -51,12 +51,10 @@ export const createRenderer = async ({
 
   const setCameraProps = (newProps: CameraProps) => {
     gpuFunctions.updateCameraProps(newProps);
-    gpuFunctions.resetState();
   }
 
   const setIsLoResMode = (enabled: boolean) => {
     gpuFunctions.setIsLoResMode(enabled);
-    gpuFunctions.resetState();
   };
 
   return {
