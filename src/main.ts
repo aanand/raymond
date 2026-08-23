@@ -108,10 +108,18 @@ const moveTo = (pageX: number, pageY: number): void => {
   updateCamera();
 }
 
-canvas.addEventListener('mousedown', event => startMoving(event.pageX, event.pageY));
+canvas.addEventListener('mousedown', event => {
+  if (event.button === 0) {
+    startMoving(event.pageX, event.pageY);
+  }
+});
 canvas.addEventListener('touchstart', event => startMoving(event.changedTouches[0].pageX, event.changedTouches[0].pageY));
 
-window.addEventListener('mouseup', stopMoving);
+window.addEventListener('mouseup', event => {
+  if (event.button === 0) {
+    stopMoving();
+  }
+});
 window.addEventListener('touchend', stopMoving)
 
 window.addEventListener('mousemove', event => {
