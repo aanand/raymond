@@ -181,9 +181,9 @@ export const makeGpuFunctions = async ({
     numBounces: d.u32,
   }));
 
-  const renderTimes: bigint[] = [];
+  const renderTimes: number[] = [];
   const drawTimes: number[] = [];
-  const maxTimingSamples = 30;
+  const maxTimingSamples = 256;
 
   const accumulate = root.createGuardedComputePipeline((pixelIndex) => {
     'use gpu';
@@ -199,7 +199,7 @@ export const makeGpuFunctions = async ({
     }
   })
   .withPerformanceCallback((start, end) => {
-    renderTimes.unshift((end - start) / BigInt(1000000));
+    renderTimes.unshift(Number((end - start) / BigInt(1000000)));
     renderTimes.splice(maxTimingSamples);
   });
 
@@ -261,8 +261,8 @@ export const makeGpuFunctions = async ({
 
     getRenderTime() {
       return {
-        render: renderTimes.reduce((a, b) => a + b, BigInt(0)),
-        draw: drawTimes.reduce((a, b) => a + b, 0),
+        render: renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length,
+        draw: drawTimes.reduce((a, b) => a + b, 0) / drawTimes.length,
       };
     }
   };

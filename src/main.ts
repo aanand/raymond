@@ -128,7 +128,7 @@ function frame() {
 
   if (debug) {
     const renderTimes = renderer.getRenderTime();
-    pre.textContent = `render: ${renderTimes.render.toString()}, draw: ${renderTimes.draw.toString()}`;
+    pre.textContent = `render: ${renderTimes.render.toFixed(0)}, draw: ${renderTimes.draw.toFixed(0)}`;
   }
 
   requestAnimationFrame(frame);
