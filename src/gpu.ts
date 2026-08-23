@@ -124,25 +124,9 @@ export const makeGpuFunctions = async ({
     const fromImagePixel = d.vec2u(d.u32(d.f32(xy.x) * pixelWidth), d.u32(d.f32(xy.y) * pixelHeight));
     const toImagePixel = d.vec2u(d.u32(d.f32(xy.x + 1) * pixelWidth), d.u32(d.f32(xy.y + 1) * pixelHeight));
 
-    // const debug = xy.x === d.u32(state.$.size.width/2) && xy.y === d.u32(state.$.size.height/2);
-    // const debug = pixelIndex < 2;
-    const debug = false;
-    if (debug) {
-      console.log('[pixelIndex=%s] xy=%s',
-        pixelIndex, xy);
-      console.log('[pixelIndex=%s] fromImagePixel=%s, toImagePixel=%s',
-        pixelIndex, fromImagePixel, toImagePixel);
-    }
-
     for (let imageY = fromImagePixel.y; imageY < toImagePixel.y; imageY++) {
       for (let imageX = fromImagePixel.x; imageX < toImagePixel.x; imageX++) {
         const imagePixelIndex = imageY * imageWidth + imageX;        
-
-        if (debug) {
-          console.log(
-            '[pixelIndex=%s] imageX=%s, imageY=%s, imagePixelIndex=%s',
-            pixelIndex, imageX, imageY, imagePixelIndex);
-        }
 
         state.$.accumulatedSamples[imagePixelIndex] = state.$.accumulatedSamples[imagePixelIndex].add(d.vec4f(
           bouncedResult.color.r,
