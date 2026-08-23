@@ -36,11 +36,8 @@ export const createRenderer = async ({
     world,
   });
 
-  let numSamplesTaken = 0;
-
   const render = async (canvas: HTMLCanvasElement) => {
     gpuFunctions.renderOnePass(samplesPerPixel, samplesPerPass, maxBounceDepth);
-    numSamplesTaken += samplesPerPass;
 
     const imageData = await gpuFunctions.getPixelData();
 
@@ -49,18 +46,10 @@ export const createRenderer = async ({
     canvas.getContext('2d')!.putImageData(imageData, 0, 0);
   }
 
-  const setCameraProps = (newProps: CameraProps) => {
-    gpuFunctions.updateCameraProps(newProps);
-  }
-
-  const setIsLoResMode = (enabled: boolean) => {
-    gpuFunctions.setIsLoResMode(enabled);
-  };
-
   return {
     render,
-    setCameraProps,
-    setIsLoResMode: setIsLoResMode,
+    setCameraProps: gpuFunctions.updateCameraProps,
+    setIsLoResMode: gpuFunctions.setIsLoResMode,
     getRenderTime: gpuFunctions.getRenderTime,
   };
 }
