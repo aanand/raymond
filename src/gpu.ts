@@ -20,7 +20,7 @@ export const makeGpuFunctions = async ({
   world: World,
 }) => {
   const numPixels = imageWidth * imageHeight;
-  const sizeList = getSizes(imageWidth, imageHeight, 64);
+  const sizeList = getSizes(imageWidth, imageHeight, 100);
 
   let sizeIndex = 0;
   let cameraProps = initialCameraProps;
@@ -207,7 +207,7 @@ export const makeGpuFunctions = async ({
     if (isLoResMode) {
       samplesPerPixel = 1;
       samplesPerPass = 1;
-      numBounces = 1;
+      numBounces = 2;
       sizeIndex = 0;
     }
 
