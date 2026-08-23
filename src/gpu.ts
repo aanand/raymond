@@ -187,7 +187,13 @@ export const makeGpuFunctions = async ({
     renderTimes.splice(maxTimingSamples);
   });
 
+  let numSamplesCollected = 0;
+
   function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
+    if (numSamplesCollected >= samplesPerPixel) {
+      return;
+    }
+
     if (isLoResMode) {
       samplesPerPixel = 1;
       samplesPerPass = 1;
@@ -209,9 +215,12 @@ export const makeGpuFunctions = async ({
     if (!isLoResMode) {
       sizeIndex = Math.min(sizeIndex + 1, sizeList.length - 1);
     }
+
+    numSamplesCollected += samplesPerPass;
   };
 
   const resetState = () => {
+    numSamplesCollected = 0;
     state.write(initialState());
   };
 
@@ -243,10 +252,11 @@ export const makeGpuFunctions = async ({
       return imageData;
     },
 
-    getRenderTime() {
+    getStats() {
       return {
         render: renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length,
         draw: drawTimes.reduce((a, b) => a + b, 0) / drawTimes.length,
+        numSamplesCollected,
       };
     }
   };

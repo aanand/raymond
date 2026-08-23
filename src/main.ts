@@ -99,10 +99,11 @@ function frame() {
   frameCount++;
 
   if (debug) {
-    const renderTimes = renderer.getRenderTime();
+    const stats = renderer.getStats();
     pre.textContent = [
-      `render: ${renderTimes.render.toFixed(0)}`,
-      `draw: ${renderTimes.draw.toFixed(0)}`,
+      `render: ${stats.render.toFixed(0)}`,
+      `draw: ${stats.draw.toFixed(0)}`,
+      `samples: ${stats.numSamplesCollected.toFixed(0)}`,
       `fps: ${fps.toFixed(0)}`
     ].join(', ');
   }

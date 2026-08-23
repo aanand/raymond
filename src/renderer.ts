@@ -50,6 +50,6 @@ export const createRenderer = async ({
     render,
     setCameraProps: gpuFunctions.updateCameraProps,
     setIsLoResMode: gpuFunctions.setIsLoResMode,
-    getRenderTime: gpuFunctions.getRenderTime,
+    getStats: gpuFunctions.getStats,
   };
 }
