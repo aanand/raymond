@@ -49,14 +49,16 @@ makeSphere(d.vec3f(0, -1000, 0), 1000, groundMaterial);
 
 const glass = makeDielectric({ refractionIndex: 0.5 });
 
-const spread = 1.8;
+const minDist = 1.8;
+const maxDist = 11;
 
-for (let a = -11; a < 11; a++) {
-  for (let b = -11; b < 11; b++) {
+for (let a = -maxDist; a < maxDist; a++) {
+  for (let b = -maxDist; b < maxDist; b++) {
     const chooseMat = Math.random();
-    const center = d.vec3f(a + spread*Math.random(), 0.2, b + spread*Math.random());
+    const center = d.vec3f(a + 0.9*Math.random(), 0.2, b + 0.9*Math.random());
 
-    if (length(center.sub(d.vec3f(0, 0, 0))) > spread) {
+    const distanceFromCenter = length(center.sub(d.vec3f(0, 0, 0)));
+    if (minDist < distanceFromCenter && distanceFromCenter < maxDist) {
       let sphereMaterial: d.Infer<typeof MaterialReference>;
 
       if (chooseMat < 0.8) {
