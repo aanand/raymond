@@ -123,12 +123,25 @@ window.addEventListener('touchmove', event => {
   moveTo(event.changedTouches[0].pageX, event.changedTouches[0].pageY);
 });
 
+let frameCount = 0;
+let fps = 0;
+
+setInterval(() => {
+  fps = frameCount;
+  frameCount = 0;
+}, 1000);
+
 function frame() {
   renderer.render(canvas);
+  frameCount++;
 
   if (debug) {
     const renderTimes = renderer.getRenderTime();
-    pre.textContent = `render: ${renderTimes.render.toFixed(0)}, draw: ${renderTimes.draw.toFixed(0)}`;
+    pre.textContent = [
+      `render: ${renderTimes.render.toFixed(0)}`,
+      `draw: ${renderTimes.draw.toFixed(0)}`,
+      `fps: ${fps.toFixed(0)}`
+    ].join(', ');
   }
 
   requestAnimationFrame(frame);
