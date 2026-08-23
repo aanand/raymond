@@ -205,6 +205,9 @@ export const makeGpuFunctions = async ({
 
   function renderOnePass(samplesPerPixel: number, samplesPerPass: number, numBounces: number) {
     if (isLoResMode) {
+      samplesPerPixel = 1;
+      samplesPerPass = 1;
+      numBounces = 1;
       sizeIndex = 0;
     }
 

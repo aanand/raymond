@@ -37,34 +37,11 @@ export const createRenderer = async ({
   });
 
   let numSamplesTaken = 0;
-  let nextPassTimeout = 0;
 
-  function renderNextPass() {
-    if (numSamplesTaken >= samplesPerPixel) {
-      return;
-    }
-
+  const render = async (canvas: HTMLCanvasElement) => {
     gpuFunctions.renderOnePass(samplesPerPixel, samplesPerPass, maxBounceDepth);
     numSamplesTaken += samplesPerPass;
 
-    if (!gpuFunctions.isLoResMode()) {
-      nextPassTimeout = setTimeout(renderNextPass, 0);
-    }
-  }
-
-  function renderAllPasses() {
-    numSamplesTaken = 0;
-
-    if (nextPassTimeout) {
-      clearTimeout(nextPassTimeout);
-      nextPassTimeout = 0;
-    }
-
-    gpuFunctions.resetState();
-    renderNextPass();
-  }
-
-  const render = async (canvas: HTMLCanvasElement) => {
     const imageData = await gpuFunctions.getPixelData();
 
     canvas.width = imageWidth;
@@ -74,17 +51,13 @@ export const createRenderer = async ({
 
   const setCameraProps = (newProps: CameraProps) => {
     gpuFunctions.updateCameraProps(newProps);
-    renderAllPasses();
+    gpuFunctions.resetState();
   }
 
   const setIsLoResMode = (enabled: boolean) => {
     gpuFunctions.setIsLoResMode(enabled);
-    if (!enabled) {
-      renderAllPasses();
-    }
+    gpuFunctions.resetState();
   };
-
-  renderAllPasses();
 
   return {
     render,
